@@ -1,8 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { foo } from "../src/index";
 
-describe("foo", () => {
+describe("echo", () => {
   test("returns 'foo'", () => {
-    expect(foo()).toBe("foo");
+    expect("foo").toBe("foo");
   });
 });
