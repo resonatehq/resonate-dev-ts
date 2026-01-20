@@ -16,12 +16,8 @@
   "scripts": {
     "test": "bun test",
     "build": "tsc",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --apply .",
-    "format": "biome format .",
-    "format:fix": "biome format --write .",
-    "check": "biome check .",
-    "check:fix": "biome check --apply ."
+    "check": "biome check",
+    "format": "biome check --write"
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
