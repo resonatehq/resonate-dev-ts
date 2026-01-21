@@ -59,7 +59,7 @@ export type Schedule = {
 };
 
 // Request & Response
-type Req<K extends string, T> = {
+type ReqSchema<K extends string, T> = {
   kind: K;
   head: {
     auth?: string;
@@ -69,7 +69,7 @@ type Req<K extends string, T> = {
   data: T;
 };
 
-type Res<K extends string, S extends number, T> = {
+type ResSchema<K extends string, S extends number, T> = {
   kind: K;
   head: {
     corrId: string;
@@ -80,12 +80,12 @@ type Res<K extends string, S extends number, T> = {
 };
 
 export type ErrorCode = 400 | 404 | 409 | 429 | 500;
-export type ErrorRes = Res<"error", ErrorCode, string>;
+export type ErrorRes = ResSchema<"error", ErrorCode, string>;
 
-export type PromiseGetReq = Req<"promise.get", { id: "string" }>;
-export type PromiseGetRes = Res<"promise.get", 200, { promise: Promise }>;
+export type PromiseGetReq = ReqSchema<"promise.get", { id: string }>;
+export type PromiseGetRes = ResSchema<"promise.get", 200, { promise: Promise }>;
 
-export type PromiseCreateReq = Req<
+export type PromiseCreateReq = ReqSchema<
   "promise.create",
   {
     id: string;
@@ -94,9 +94,13 @@ export type PromiseCreateReq = Req<
     timeoutAt: number;
   }
 >;
-export type PromiseCreateRes = Res<"promise.create", 200, { promise: Promise }>;
+export type PromiseCreateRes = ResSchema<
+  "promise.create",
+  200,
+  { promise: Promise }
+>;
 
-export type PromiseSettleReq = Req<
+export type PromiseSettleReq = ReqSchema<
   "promise.settle",
   {
     id: string;
@@ -104,53 +108,57 @@ export type PromiseSettleReq = Req<
     value: { headers: { [key: string]: string }; data: string };
   }
 >;
-export type PromiseSettleRes = Res<"promise.settle", 200, { promise: Promise }>;
+export type PromiseSettleRes = ResSchema<
+  "promise.settle",
+  200,
+  { promise: Promise }
+>;
 
-export type PromiseRegisterReq = Req<
+export type PromiseRegisterReq = ReqSchema<
   "promise.register",
   { awaiter: string; awaited: string }
 >;
-export type PromiseRegisterRes = Res<
+export type PromiseRegisterRes = ResSchema<
   "promise.register",
   200,
   { promise: Promise }
 >;
 
-export type PromiseSubscribeReq = Req<
+export type PromiseSubscribeReq = ReqSchema<
   "promise.subscribe",
   { awaited: string; address: string }
 >;
-export type PromiseSubscribeRes = Res<
+export type PromiseSubscribeRes = ResSchema<
   "promise.subscribe",
   200,
   { promise: Promise }
 >;
 
-export type TaskGetReq = Req<"task.get", { id: string }>;
-export type TaskGetRes = Res<"task.get", 200, { task: Task }>;
+export type TaskGetReq = ReqSchema<"task.get", { id: string }>;
+export type TaskGetRes = ResSchema<"task.get", 200, { task: Task }>;
 
-export type TaskCreateReq = Req<
+export type TaskCreateReq = ReqSchema<
   "task.create",
   { pid: string; ttl: number; action: PromiseCreateReq }
 >;
-export type TaskCreateRes = Res<
+export type TaskCreateRes = ResSchema<
   "task.create",
   200,
   { task?: Task; promise: Promise }
 >;
 
-export type TaskAcquireReq = Req<
+export type TaskAcquireReq = ReqSchema<
   "task.acquire",
   { id: string; version: number; pid: string; ttl: number }
 >;
-export type TaskAcquireRes = Res<
+export type TaskAcquireRes = ResSchema<
   "task.acquire",
   200,
   | { kind: "invoke"; data: { invoked: Promise } }
   | { kind: "resume"; data: { invoked: Promise; awaited: Promise } }
 >;
 
-export type TaskSuspendReq = Req<
+export type TaskSuspendReq = ReqSchema<
   "task.suspend",
   {
     id: string;
@@ -158,9 +166,9 @@ export type TaskSuspendReq = Req<
     actions: PromiseRegisterReq[];
   }
 >;
-export type TaskSuspendRes = Res<"task.suspend", 200 | 300, undefined>;
+export type TaskSuspendRes = ResSchema<"task.suspend", 200 | 300, undefined>;
 
-export type TaskFulfillReq = Req<
+export type TaskFulfillReq = ReqSchema<
   "task.fulfill",
   {
     id: string;
@@ -168,15 +176,19 @@ export type TaskFulfillReq = Req<
     action: PromiseSettleReq;
   }
 >;
-export type TaskFulfillRes = Res<"task.fulfill", 200, { promise: Promise }>;
+export type TaskFulfillRes = ResSchema<
+  "task.fulfill",
+  200,
+  { promise: Promise }
+>;
 
-export type TaskReleaseReq = Req<
+export type TaskReleaseReq = ReqSchema<
   "task.release",
   { id: string; version: number }
 >;
-export type TaskReleaseRes = Res<"task.release", 200, undefined>;
+export type TaskReleaseRes = ResSchema<"task.release", 200, undefined>;
 
-export type TaskFenceReq = Req<
+export type TaskFenceReq = ReqSchema<
   "task.fence",
   {
     id: string;
@@ -184,22 +196,26 @@ export type TaskFenceReq = Req<
     action: PromiseCreateReq | PromiseSettleReq;
   }
 >;
-export type TaskFenceRes = Res<
+export type TaskFenceRes = ResSchema<
   "task.fence",
   200,
   { action: PromiseCreateRes | PromiseSettleRes }
 >;
 
-export type TaskHeartbeatReq = Req<
+export type TaskHeartbeatReq = ReqSchema<
   "task.heartbeat",
   { pid: string; tasks: Task[] }
 >;
-export type TaskHeartbeatRes = Res<"task.heartbeat", 200, undefined>;
+export type TaskHeartbeatRes = ResSchema<"task.heartbeat", 200, undefined>;
 
-export type ScheduleGetReq = Req<"schedule.get", { id: string }>;
-export type ScheduleGetRes = Res<"schedule.get", 200, { schedule: Schedule }>;
+export type ScheduleGetReq = ReqSchema<"schedule.get", { id: string }>;
+export type ScheduleGetRes = ResSchema<
+  "schedule.get",
+  200,
+  { schedule: Schedule }
+>;
 
-export type ScheduleCreateReq = Req<
+export type ScheduleCreateReq = ReqSchema<
   "schedule.create",
   {
     id: string;
@@ -210,11 +226,48 @@ export type ScheduleCreateReq = Req<
     promiseTags: { [key: string]: string };
   }
 >;
-export type ScheduleCreateRes = Res<
+export type ScheduleCreateRes = ResSchema<
   "schedule.create",
   200,
   { schedule: Schedule }
 >;
 
-export type ScheduleDeleteReq = Req<"schedule.delete", { id: string }>;
-export type ScheduleDeleteRes = Res<"schedule.delete", 200, undefined>;
+export type ScheduleDeleteReq = ReqSchema<"schedule.delete", { id: string }>;
+export type ScheduleDeleteRes = ResSchema<"schedule.delete", 200, undefined>;
+
+export type Req =
+  | PromiseGetReq
+  | PromiseCreateReq
+  | PromiseSettleReq
+  | PromiseRegisterReq
+  | PromiseSubscribeReq
+  | TaskGetReq
+  | TaskCreateReq
+  | TaskAcquireReq
+  | TaskSuspendReq
+  | TaskFulfillReq
+  | TaskReleaseReq
+  | TaskFenceReq
+  | TaskHeartbeatReq
+  | ScheduleGetReq
+  | ScheduleCreateReq
+  | ScheduleDeleteReq;
+
+export type Res =
+  | PromiseGetRes
+  | PromiseCreateRes
+  | PromiseSettleRes
+  | PromiseRegisterRes
+  | PromiseSubscribeRes
+  | TaskGetRes
+  | TaskCreateRes
+  | TaskAcquireRes
+  | TaskSuspendRes
+  | TaskFulfillRes
+  | TaskReleaseRes
+  | TaskFenceRes
+  | TaskHeartbeatRes
+  | ScheduleGetRes
+  | ScheduleCreateRes
+  | ScheduleDeleteRes
+  | ErrorRes;

@@ -14,6 +14,8 @@ import type {
   PromiseState,
   PromiseSubscribeReq,
   PromiseSubscribeRes,
+  Req,
+  Res,
   Schedule,
   Task,
   TaskAcquireReq,
@@ -32,7 +34,7 @@ import type {
   TaskSuspendRes,
 } from "./protocol";
 
-function assert(cond: boolean, msg?: string): asserts cond {
+export function assert(cond: boolean, msg?: string): asserts cond {
   if (cond) return; // Early return if assertion passes
 
   console.assert(cond, "Assertion Failed: %s", msg);
@@ -43,7 +45,7 @@ function assert(cond: boolean, msg?: string): asserts cond {
   }
 }
 
-function assertDefined<T>(val: T | undefined | null): asserts val is T {
+export function assertDefined<T>(val: T | undefined | null): asserts val is T {
   assert(val !== null && val !== undefined, "value must not be null");
 }
 
@@ -100,34 +102,6 @@ class DefaultRouter {
     return promise.tags[this.tag];
   }
 }
-
-export type Req =
-  | PromiseGetReq
-  | PromiseCreateReq
-  | PromiseSettleReq
-  | PromiseRegisterReq
-  | PromiseSubscribeReq
-  | TaskGetReq
-  | TaskCreateReq
-  | TaskAcquireReq
-  | TaskSuspendReq
-  | TaskFulfillReq
-  | TaskReleaseReq
-  | TaskHeartbeatReq;
-export type Res =
-  | PromiseGetRes
-  | PromiseCreateRes
-  | PromiseSettleRes
-  | PromiseRegisterRes
-  | PromiseSubscribeRes
-  | TaskGetRes
-  | TaskCreateRes
-  | TaskAcquireRes
-  | TaskSuspendRes
-  | TaskFulfillRes
-  | TaskReleaseRes
-  | TaskHeartbeatRes
-  | ErrorRes;
 
 export class Server {
   private version = "2025-01-15";
@@ -264,41 +238,53 @@ export class Server {
 
     try {
       switch (req.kind) {
-        case "promise.get": {
-          return this.promiseGet({ req });
-        }
         case "promise.create": {
           return this.promiseCreate({ at, req });
         }
-        case "promise.settle": {
-          return this.promiseSettle({ at, req });
+        case "promise.get": {
+          return this.promiseGet({ req });
         }
         case "promise.register": {
           return this.promiseRegister({ at, req });
         }
+        case "promise.settle": {
+          return this.promiseSettle({ at, req });
+        }
         case "promise.subscribe": {
           return this.promiseSubscribe({ at, req });
         }
-        case "task.get": {
-          return this.taskGet({ req });
+        case "schedule.create": {
+          throw new ServerError(500, "not implemented");
         }
-        case "task.create": {
-          return this.taskCreate({ at, req });
+        case "schedule.delete": {
+          throw new ServerError(500, "not implemented");
+        }
+        case "schedule.get": {
+          throw new ServerError(500, "not implemented");
         }
         case "task.acquire": {
           return this.taskAcquire({ at, req });
         }
-        case "task.suspend": {
-          return this.taskSuspend({ at, req });
+        case "task.create": {
+          return this.taskCreate({ at, req });
+        }
+        case "task.fence": {
+          throw new ServerError(500, "not implemented");
         }
         case "task.fulfill": {
           return this.taskFulFill({ at, req });
         }
-        case "task.release": {
-          return this.taskRelease({ at, req });
+        case "task.get": {
+          return this.taskGet({ req });
         }
         case "task.heartbeat": {
           return this.taskHeartbeat({ at, req });
+        }
+        case "task.release": {
+          return this.taskRelease({ at, req });
+        }
+        case "task.suspend": {
+          return this.taskSuspend({ at, req });
         }
       }
     } catch (err) {
@@ -309,90 +295,93 @@ export class Server {
     }
   }
 
-  private taskHeartbeat({
+  private promiseCreate({
     at,
     req,
   }: {
     at: number;
-    req: TaskHeartbeatReq;
-  }): TaskHeartbeatRes {
-    for (const taskRecord of Object.values(this.tasks)) {
-      if (taskRecord.state !== "claimed" || taskRecord.pid !== req.data.pid) {
-        continue;
-      }
+    req: PromiseCreateReq;
+  }): PromiseCreateRes {
 
-      const { applied } = this.transitionTask({
-        at,
-        id: taskRecord.id,
-        to: "claimed",
-        force: true,
-      });
-      assert(applied);
+    const { promiseRecord, taskRecord } = this.promiseAndTaskCreate({
+      at,
+      id: req.data.id,
+      timeoutAt: req.data.timeoutAt,
+      payload: req.data.param,
+      tags: req.data.tags,
+    });
+
+    assert(taskRecord === undefined || taskRecord.state !== "claimed");
+
+    return this.buildOkRes(req, 200, { promise: promiseRecord });
+  }
+  private promiseGet({ req }: { req: PromiseGetReq }): PromiseGetRes {
+    const record = this.getPromiseRecord(req.data.id);
+    return this.buildOkRes(req, 200, { promise: record });
+  }
+  private promiseRegister({
+    at,
+    req,
+  }: {
+    at: number;
+    req: PromiseRegisterReq;
+  }): PromiseRegisterRes {
+    const { record } = this.promiseTryToRegister({
+      at,
+      awaited: req.data.awaited,
+      awaiter: req.data.awaiter,
+    });
+    return this.buildOkRes(req, 200, { promise: record });
+  }
+  private promiseSettle({
+    at,
+    req,
+  }: {
+    at: number;
+    req: PromiseSettleReq;
+  }): PromiseSettleRes {
+    const { promiseRecord, applied } = this.transitionPromiseAndTask({
+      at,
+      id: req.data.id,
+      to: req.data.state,
+      payload: req.data.value,
+    });
+    assert(
+      !applied ||
+        promiseRecord.state === "rejected_timedout" ||
+        promiseRecord.state === req.data.state,
+    );
+    return this.buildOkRes(req, 200, { promise: promiseRecord });
+  }
+  private promiseSubscribe({
+    at,
+    req,
+  }: {
+    at: number;
+    req: PromiseSubscribeReq;
+  }): PromiseSubscribeRes {
+    const record = this.getPromiseRecord(req.data.awaited);
+    const callbackId = `__resume:${req.data.address}:${req.data.awaited}`;
+
+    if (
+      record.state !== "pending" ||
+      record.callbacks[req.data.awaited] !== undefined
+    ) {
+      return this.buildOkRes(req, 200, { promise: record });
     }
 
-    return this.buildOkRes(req, 200, undefined);
-  }
-
-  private taskRelease({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskReleaseReq;
-  }): TaskReleaseRes {
-    const { applied } = this.transitionTask({
-      at,
-      id: req.data.id,
-      to: "init",
-      version: req.data.version,
-    });
-    assert(applied);
-    return this.buildOkRes(req, 200, undefined);
-  }
-  private taskFulFill({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskFulfillReq;
-  }): TaskFulfillRes {
-    const res = this.promiseSettle({ at, req: req.data.action });
-    const { applied } = this.transitionTask({
-      at,
-      id: req.data.id,
-      to: "completed",
-      version: req.data.version,
-    });
-    assert(applied);
-
-    return this.buildOkRes(req, 200, res.data);
-  }
-  private taskSuspend({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskSuspendReq;
-  }): TaskSuspendRes {
-    let status: 200 | 300 = 200;
-    for (const action of req.data.actions) {
-      const { applied } = this.promiseTryToRegister({
-        at,
-        awaited: action.data.awaited,
-        awaiter: action.data.awaiter,
-      });
-      if (!applied) {
-        status = 300;
-      }
-    }
-    const { applied } = this.transitionTask({
-      at,
-      id: req.data.id,
-      to: "completed",
-      version: req.data.version,
-    });
-    assert(applied);
-    return this.buildOkRes(req, status, undefined);
+    const recv = this.getFirstRouterMatch(record);
+    assertDefined(recv);
+    record.callbacks[callbackId] = {
+      id: callbackId,
+      type: "notify",
+      awaited: req.data.awaited,
+      awaiter: req.data.address,
+      recv,
+      timeoutAt: record.timeoutAt,
+      createdAt: at,
+    };
+    return this.buildOkRes(req, 200, { promise: record });
   }
   private taskAcquire({
     at,
@@ -453,41 +442,99 @@ export class Server {
       task: taskRecord,
     });
   }
-  private taskGet({ req }: { req: TaskGetReq }): TaskGetRes {
-    const record = this.getTaskRecord(req.data.id);
-    return this.buildOkRes(req, 200, { task: record });
-  }
-
-  private promiseSubscribe({
+  private taskFulFill({
     at,
     req,
   }: {
     at: number;
-    req: PromiseSubscribeReq;
-  }): PromiseSubscribeRes {
-    const record = this.getPromiseRecord(req.data.awaited);
-    const callbackId = `__resume:${req.data.address}:${req.data.awaited}`;
+    req: TaskFulfillReq;
+  }): TaskFulfillRes {
+    const res = this.promiseSettle({ at, req: req.data.action });
+    const { applied } = this.transitionTask({
+      at,
+      id: req.data.id,
+      to: "completed",
+      version: req.data.version,
+    });
+    assert(applied);
 
-    if (
-      record.state !== "pending" ||
-      record.callbacks[req.data.awaited] !== undefined
-    ) {
-      return this.buildOkRes(req, 200, { promise: record });
+    return this.buildOkRes(req, 200, res.data);
+  }
+  private taskGet({ req }: { req: TaskGetReq }): TaskGetRes {
+    const record = this.getTaskRecord(req.data.id);
+    return this.buildOkRes(req, 200, { task: record });
+  }
+  private taskHeartbeat({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskHeartbeatReq;
+  }): TaskHeartbeatRes {
+    for (const taskRecord of Object.values(this.tasks)) {
+      if (taskRecord.state !== "claimed" || taskRecord.pid !== req.data.pid) {
+        continue;
+      }
+
+      const { applied } = this.transitionTask({
+        at,
+        id: taskRecord.id,
+        to: "claimed",
+        force: true,
+      });
+      assert(applied);
     }
 
-    const recv = this.getFirstRouterMatch(record);
-    assertDefined(recv);
-    record.callbacks[callbackId] = {
-      id: callbackId,
-      type: "notify",
-      awaited: req.data.awaited,
-      awaiter: req.data.address,
-      recv,
-      timeoutAt: record.timeoutAt,
-      createdAt: at,
-    };
-    return this.buildOkRes(req, 200, { promise: record });
+    return this.buildOkRes(req, 200, undefined);
   }
+
+  private taskRelease({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskReleaseReq;
+  }): TaskReleaseRes {
+    const { applied } = this.transitionTask({
+      at,
+      id: req.data.id,
+      to: "init",
+      version: req.data.version,
+    });
+    assert(applied);
+    return this.buildOkRes(req, 200, undefined);
+  }
+
+  private taskSuspend({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskSuspendReq;
+  }): TaskSuspendRes {
+    let status: 200 | 300 = 200;
+    for (const action of req.data.actions) {
+      const { applied } = this.promiseTryToRegister({
+        at,
+        awaited: action.data.awaited,
+        awaiter: action.data.awaiter,
+      });
+      if (!applied) {
+        status = 300;
+      }
+    }
+    const { applied } = this.transitionTask({
+      at,
+      id: req.data.id,
+      to: "completed",
+      version: req.data.version,
+    });
+    assert(applied);
+    return this.buildOkRes(req, status, undefined);
+  }
+
+
+
 
   private promiseTryToRegister({
     at,
@@ -518,40 +565,6 @@ export class Server {
     };
 
     return { record, applied: true };
-  }
-  private promiseRegister({
-    at,
-    req,
-  }: {
-    at: number;
-    req: PromiseRegisterReq;
-  }): PromiseRegisterRes {
-    const { record } = this.promiseTryToRegister({
-      at,
-      awaited: req.data.awaited,
-      awaiter: req.data.awaiter,
-    });
-    return this.buildOkRes(req, 200, { promise: record });
-  }
-  private promiseSettle({
-    at,
-    req,
-  }: {
-    at: number;
-    req: PromiseSettleReq;
-  }): PromiseSettleRes {
-    const { promiseRecord, applied } = this.transitionPromiseAndTask({
-      at,
-      id: req.data.id,
-      to: req.data.state,
-      payload: req.data.value,
-    });
-    assert(
-      !applied ||
-        promiseRecord.state === "rejected_timedout" ||
-        promiseRecord.state === req.data.state,
-    );
-    return this.buildOkRes(req, 200, { promise: promiseRecord });
   }
 
   private promiseAndTaskCreate({
@@ -613,29 +626,6 @@ export class Server {
     }
 
     return { promiseRecord, taskRecord };
-  }
-  private promiseCreate({
-    at,
-    req,
-  }: {
-    at: number;
-    req: PromiseCreateReq;
-  }): PromiseCreateRes {
-    const { promiseRecord, taskRecord } = this.promiseAndTaskCreate({
-      at,
-      id: req.data.id,
-      timeoutAt: req.data.timeoutAt,
-      payload: req.data.param,
-      tags: req.data.tags,
-    });
-    assert(taskRecord === undefined);
-
-    return this.buildOkRes(req, 200, { promise: promiseRecord });
-  }
-
-  private promiseGet({ req }: { req: PromiseGetReq }): PromiseGetRes {
-    const record = this.getPromiseRecord(req.data.id);
-    return this.buildOkRes(req, 200, { promise: record });
   }
 
   private buildOkRes<K extends string, S extends number, D>(
