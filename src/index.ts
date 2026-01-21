@@ -1,37 +1,28 @@
+import CronExpressionParser from "cron-parser";
 import type {
   ErrorCode,
   ErrorRes,
   Message,
   Promise,
   PromiseCreateReq,
-  PromiseCreateRes,
   PromiseGetReq,
-  PromiseGetRes,
   PromiseRegisterReq,
-  PromiseRegisterRes,
   PromiseSettleReq,
-  PromiseSettleRes,
   PromiseState,
   PromiseSubscribeReq,
-  PromiseSubscribeRes,
   Req,
   Res,
   Schedule,
+  ScheduleCreateReq,
+  ScheduleDeleteReq,
+  ScheduleGetReq,
   Task,
   TaskAcquireReq,
-  TaskAcquireRes,
   TaskCreateReq,
-  TaskCreateRes,
-  TaskFulfillReq,
-  TaskFulfillRes,
   TaskGetReq,
-  TaskGetRes,
   TaskHeartbeatReq,
-  TaskHeartbeatRes,
   TaskReleaseReq,
-  TaskReleaseRes,
   TaskSuspendReq,
-  TaskSuspendRes,
 } from "./protocol";
 
 export function assert(cond: boolean, msg?: string): asserts cond {
@@ -94,11 +85,8 @@ interface Router {
 }
 
 class DefaultRouter {
-  private tag: "resonate:invoke" = "resonate:invoke";
+  private tag = "resonate:invoke";
   route(promise: PromiseRecord): string | undefined {
-    if (promise.tags === undefined) {
-      return undefined;
-    }
     return promise.tags[this.tag];
   }
 }
@@ -108,7 +96,7 @@ export class Server {
   private promises: { [key: string]: PromiseRecord } = {};
   private tasks: { [key: string]: TaskRecord } = {};
   private schedules: { [key: string]: ScheduleRecord } = {};
-  private routers: Router[] = [new DefaultRouter()];
+  private router: Router = new DefaultRouter();
   private targets: { [key: string]: string } = {
     default: "local://any@default",
   };
@@ -118,7 +106,7 @@ export class Server {
     this.x = x;
   }
 
-  next({ time }: { time: number }): number | undefined {
+  next({ at }: { at: number }): number | undefined {
     let timeout: number | undefined;
 
     for (const promiseRecord of Object.values(this.promises)) {
@@ -130,6 +118,10 @@ export class Server {
       }
     }
 
+    for (const schedule of Object.values(this.schedules)) {
+      timeout = Math.min(schedule.nextRunAt, timeout ?? schedule.nextRunAt);
+    }
+
     for (const taskRecord of Object.values(this.tasks)) {
       if (isNotCompleted(taskRecord.state)) {
         timeout = Math.min(taskRecord.expiry, timeout ?? taskRecord.expiry);
@@ -137,11 +129,41 @@ export class Server {
     }
 
     return timeout !== undefined
-      ? Math.min(Math.max(0, timeout - time), 2147483647)
+      ? Math.min(Math.max(0, timeout - at), 2147483647)
       : timeout;
   }
 
   step({ at }: { at: number }): { mesg: Message; recv: string }[] {
+    for (const schedule of Object.values(this.schedules)) {
+      if (at < schedule.nextRunAt) {
+        continue;
+      }
+
+      try {
+        this.promiseCreate({
+          at,
+          req: {
+            kind: "promise.create",
+            head: { corrId: "", version: this.version },
+            data: {
+              id: schedule.promiseId.replace("{{.timestamp}}", at.toString()),
+              param: schedule.promiseParam,
+              tags: schedule.promiseTags,
+              timeoutAt: at + schedule.promiseTimeout,
+            },
+          },
+        });
+      } catch {}
+
+      const { applied } = this.transitionSchedule({
+        at,
+        id: schedule.id,
+        to: "created",
+        updating: true,
+      });
+      assert(applied);
+    }
+
     for (const promiseRecord of Object.values(this.promises)) {
       if (promiseRecord.state === "pending" && at >= promiseRecord.timeoutAt) {
         const { applied } = this.transitionPromise({
@@ -155,8 +177,6 @@ export class Server {
 
     for (const taskRecord of Object.values(this.tasks)) {
       if (isActiveState(taskRecord.state)) {
-        assertDefined(taskRecord.expiry);
-
         if (at >= taskRecord.expiry) {
           const { applied } = this.transitionTask({
             at,
@@ -239,52 +259,110 @@ export class Server {
     try {
       switch (req.kind) {
         case "promise.create": {
-          return this.promiseCreate({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.promiseCreate({ at, req }),
+          });
         }
         case "promise.get": {
-          return this.promiseGet({ req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.promiseGet({ req }),
+          });
         }
         case "promise.register": {
-          return this.promiseRegister({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.promiseRegister({ at, req }),
+          });
         }
         case "promise.settle": {
-          return this.promiseSettle({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.promiseSettle({ at, req }),
+          });
         }
         case "promise.subscribe": {
-          return this.promiseSubscribe({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.promiseSubscribe({ at, req }),
+          });
         }
         case "schedule.create": {
-          throw new ServerError(500, "not implemented");
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.scheduleCreate({ at, req }),
+          });
         }
         case "schedule.delete": {
-          throw new ServerError(500, "not implemented");
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.scheduleDelete({ at, req }),
+          });
         }
         case "schedule.get": {
-          throw new ServerError(500, "not implemented");
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.scheduleGet({ req }),
+          });
         }
         case "task.acquire": {
-          return this.taskAcquire({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.taskAcquire({ at, req }),
+          });
         }
         case "task.create": {
-          return this.taskCreate({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.taskCreate({ at, req }),
+          });
         }
         case "task.fence": {
-          throw new ServerError(500, "not implemented");
+          assert(false, "not implemented");
+          break;
         }
         case "task.fulfill": {
-          return this.taskFulFill({ at, req });
+          assert(false, "not implemented");
+          break;
         }
         case "task.get": {
-          return this.taskGet({ req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.taskGet({ req }),
+          });
         }
         case "task.heartbeat": {
-          return this.taskHeartbeat({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.taskHeartbeat({ at, req }),
+          });
         }
         case "task.release": {
-          return this.taskRelease({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.taskRelease({ at, req }),
+          });
         }
         case "task.suspend": {
-          return this.taskSuspend({ at, req });
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.taskSuspend({ at, req }),
+          });
         }
       }
     } catch (err) {
@@ -295,29 +373,33 @@ export class Server {
     }
   }
 
-  private promiseCreate({
-    at,
-    req,
-  }: {
-    at: number;
-    req: PromiseCreateReq;
-  }): PromiseCreateRes {
-
-    const { promiseRecord, taskRecord } = this.promiseAndTaskCreate({
+  private promiseCreate({ at, req }: { at: number; req: PromiseCreateReq }): {
+    status: 200;
+    data: { promise: Promise };
+  } {
+    const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
-      timeoutAt: req.data.timeoutAt,
+      to: "pending",
       payload: req.data.param,
       tags: req.data.tags,
+      timeoutAt: req.data.timeoutAt,
     });
-
-    assert(taskRecord === undefined || taskRecord.state !== "claimed");
-
-    return this.buildOkRes(req, 200, { promise: promiseRecord });
+    assert(
+      !applied ||
+        promise.state === "pending" ||
+        promise.state === "rejected_timedout",
+    );
+    return { status: 200, data: { promise } };
   }
-  private promiseGet({ req }: { req: PromiseGetReq }): PromiseGetRes {
-    const record = this.getPromiseRecord(req.data.id);
-    return this.buildOkRes(req, 200, { promise: record });
+  private promiseGet({ req }: { req: PromiseGetReq }): {
+    status: 200;
+    data: { promise: Promise };
+  } {
+    return {
+      status: 200,
+      data: { promise: this.getPromiseRecord(req.data.id) },
+    };
   }
   private promiseRegister({
     at,
@@ -325,22 +407,41 @@ export class Server {
   }: {
     at: number;
     req: PromiseRegisterReq;
-  }): PromiseRegisterRes {
-    const { record } = this.promiseTryToRegister({
-      at,
+  }): {
+    status: 200;
+    data: {
+      promise: Promise;
+    };
+    created: boolean;
+  } {
+    const promise = this.getPromiseRecord(req.data.awaited);
+    if (
+      promise.state === "pending" ||
+      promise.callbacks[req.data.awaited] !== undefined
+    ) {
+      return { status: 200, data: { promise }, created: false };
+    }
+    const cbId = `__resume:${req.data.awaiter}:${req.data.awaited}`;
+    const recv = this.router.route(promise);
+    if (!recv) {
+      throw new ServerError(500, "recv must be set");
+    }
+    promise.callbacks[cbId] = {
+      id: cbId,
+      type: "resume",
       awaited: req.data.awaited,
       awaiter: req.data.awaiter,
-    });
-    return this.buildOkRes(req, 200, { promise: record });
+      recv,
+      timeoutAt: promise.timeoutAt,
+      createdAt: at,
+    };
+    return { status: 200, data: { promise }, created: true };
   }
-  private promiseSettle({
-    at,
-    req,
-  }: {
-    at: number;
-    req: PromiseSettleReq;
-  }): PromiseSettleRes {
-    const { promiseRecord, applied } = this.transitionPromiseAndTask({
+  private promiseSettle({ at, req }: { at: number; req: PromiseSettleReq }): {
+    status: 200;
+    data: { promise: Promise };
+  } {
+    const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
       to: req.data.state,
@@ -348,10 +449,10 @@ export class Server {
     });
     assert(
       !applied ||
-        promiseRecord.state === "rejected_timedout" ||
-        promiseRecord.state === req.data.state,
+        promise.state === req.data.state ||
+        promise.state === "rejected_timedout",
     );
-    return this.buildOkRes(req, 200, { promise: promiseRecord });
+    return { status: 200, data: { promise } };
   }
   private promiseSubscribe({
     at,
@@ -359,38 +460,81 @@ export class Server {
   }: {
     at: number;
     req: PromiseSubscribeReq;
-  }): PromiseSubscribeRes {
-    const record = this.getPromiseRecord(req.data.awaited);
-    const callbackId = `__resume:${req.data.address}:${req.data.awaited}`;
+  }): { status: 200; data: { promise: Promise } } {
+    const promise = this.getPromiseRecord(req.data.awaited);
 
     if (
-      record.state !== "pending" ||
-      record.callbacks[req.data.awaited] !== undefined
+      promise.state !== "pending" ||
+      promise.callbacks[req.data.awaited] !== undefined
     ) {
-      return this.buildOkRes(req, 200, { promise: record });
+      return { status: 200, data: { promise } };
     }
-
-    const recv = this.getFirstRouterMatch(record);
-    assertDefined(recv);
-    record.callbacks[callbackId] = {
-      id: callbackId,
+    const recv = this.router.route(promise);
+    if (!recv) {
+      throw new ServerError(500, "recv must be set");
+    }
+    const cbId = `__notify:${req.data.address}:${req.data.awaited}`;
+    promise.callbacks[cbId] = {
+      id: cbId,
       type: "notify",
       awaited: req.data.awaited,
-      awaiter: req.data.address,
+      awaiter: req.data.awaited,
       recv,
-      timeoutAt: record.timeoutAt,
+      timeoutAt: promise.timeoutAt,
       createdAt: at,
     };
-    return this.buildOkRes(req, 200, { promise: record });
+    return { status: 200, data: { promise } };
   }
-  private taskAcquire({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskAcquireReq;
-  }): TaskAcquireRes {
-    const { record, applied } = this.transitionTask({
+  private scheduleCreate({ at, req }: { at: number; req: ScheduleCreateReq }): {
+    status: 200;
+    data: {
+      schedule: Schedule;
+    };
+  } {
+    return {
+      status: 200,
+      data: {
+        schedule: this.transitionSchedule({
+          at,
+          id: req.data.id,
+          to: "created",
+          cron: req.data.cron,
+          promiseId: req.data.promiseId,
+          promiseTimeout: req.data.promiseTimeout,
+          promiseParam: req.data.promiseParam,
+          promiseTags: req.data.promiseTags,
+        }).schedule,
+      },
+    };
+  }
+  private scheduleDelete({ at, req }: { at: number; req: ScheduleDeleteReq }): {
+    status: 200;
+    data: undefined;
+  } {
+    const { applied } = this.transitionSchedule({
+      at,
+      id: req.data.id,
+      to: "deleted",
+    });
+    assert(applied);
+    return { status: 200, data: undefined };
+  }
+  private scheduleGet({ req }: { req: ScheduleGetReq }): {
+    status: 200;
+    data: { schedule: Schedule };
+  } {
+    return {
+      status: 200,
+      data: { schedule: this.getScheduleRecord(req.data.id) },
+    };
+  }
+  private taskAcquire({ at, req }: { at: number; req: TaskAcquireReq }): {
+    status: 200;
+    data:
+      | { kind: "invoke"; data: { invoked: Promise } }
+      | { kind: "resume"; data: { invoked: Promise; awaited: Promise } };
+  } {
+    const { record: task, applied } = this.transitionTask({
       at,
       id: req.data.id,
       to: "claimed",
@@ -399,102 +543,102 @@ export class Server {
       ttl: req.data.ttl,
     });
     assert(applied);
-    switch (record.type) {
+    assert(task.type !== "notify");
+    switch (task.type) {
       case "invoke": {
-        return this.buildOkRes(req, 200, {
-          kind: "invoke",
-          data: { invoked: this.getPromiseRecord(record.awaiter) },
-        });
+        return {
+          status: 200,
+          data: {
+            kind: task.type,
+            data: { invoked: this.getPromiseRecord(task.awaiter) },
+          },
+        };
       }
       case "resume": {
-        return this.buildOkRes(req, 200, {
-          kind: "resume",
+        return {
+          status: 200,
           data: {
-            invoked: this.getPromiseRecord(record.awaiter),
-            awaited: this.getPromiseRecord(record.awaited),
+            kind: task.type,
+            data: {
+              invoked: this.getPromiseRecord(task.awaiter),
+              awaited: this.getPromiseRecord(task.awaited),
+            },
           },
-        });
-      }
-      case "notify": {
-        throw new ServerError(500, "unexpected task type");
+        };
       }
     }
   }
-  private taskCreate({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskCreateReq;
-  }): TaskCreateRes {
-    const { promiseRecord, taskRecord } = this.promiseAndTaskCreate({
+  private taskCreate({ at, req }: { at: number; req: TaskCreateReq }): {
+    status: 200;
+    data: {
+      task?: Task;
+      promise: Promise;
+    };
+  } {
+    const {
+      promiseRecord: promise,
+      taskRecord: task,
+      applied,
+    } = this.transitionPromiseAndTask({
       at,
       id: req.data.action.data.id,
-      timeoutAt: req.data.action.data.timeoutAt,
+      to: "pending",
       payload: req.data.action.data.param,
       tags: req.data.action.data.tags,
-      ttl: req.data.ttl,
-      pid: req.data.pid,
+      timeoutAt: req.data.action.data.timeoutAt,
     });
-
-    return this.buildOkRes(req, 200, {
-      promise: promiseRecord,
-      task: taskRecord,
-    });
+    assert(
+      !applied ||
+        promise.state === "pending" ||
+        promise.state === "rejected_timedout",
+    );
+    if (applied && task !== undefined) {
+      const { record: claimedTask, applied } = this.transitionTask({
+        at,
+        id: task.id,
+        to: "claimed",
+        version: 1,
+        pid: req.data.pid,
+        ttl: req.data.ttl,
+      });
+      assert(applied);
+      assert(claimedTask.state === "claimed");
+      return { status: 200, data: { task: claimedTask, promise } };
+    }
+    return { status: 200, data: { promise, task } };
   }
-  private taskFulFill({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskFulfillReq;
-  }): TaskFulfillRes {
-    const res = this.promiseSettle({ at, req: req.data.action });
-    const { applied } = this.transitionTask({
-      at,
-      id: req.data.id,
-      to: "completed",
-      version: req.data.version,
-    });
-    assert(applied);
-
-    return this.buildOkRes(req, 200, res.data);
+  private taskGet({ req }: { req: TaskGetReq }): {
+    status: 200;
+    data: {
+      task: Task;
+    };
+  } {
+    return { status: 200, data: { task: this.getTaskRecord(req.data.id) } };
   }
-  private taskGet({ req }: { req: TaskGetReq }): TaskGetRes {
-    const record = this.getTaskRecord(req.data.id);
-    return this.buildOkRes(req, 200, { task: record });
-  }
-  private taskHeartbeat({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskHeartbeatReq;
-  }): TaskHeartbeatRes {
-    for (const taskRecord of Object.values(this.tasks)) {
-      if (taskRecord.state !== "claimed" || taskRecord.pid !== req.data.pid) {
+  private taskHeartbeat({ at, req }: { at: number; req: TaskHeartbeatReq }): {
+    status: 200;
+    data: undefined;
+  } {
+    for (const task of Object.values(this.tasks)) {
+      if (task.state !== "claimed" || task.pid !== req.data.pid) {
         continue;
       }
-
       const { applied } = this.transitionTask({
         at,
-        id: taskRecord.id,
+        id: task.id,
         to: "claimed",
         force: true,
       });
       assert(applied);
     }
 
-    return this.buildOkRes(req, 200, undefined);
+    return { status: 200, data: undefined };
   }
 
-  private taskRelease({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskReleaseReq;
-  }): TaskReleaseRes {
+  private taskRelease({ at, req }: { at: number; req: TaskReleaseReq }): {
+    status: 200;
+    data: undefined;
+  } {
     const { applied } = this.transitionTask({
       at,
       id: req.data.id,
@@ -502,269 +646,28 @@ export class Server {
       version: req.data.version,
     });
     assert(applied);
-    return this.buildOkRes(req, 200, undefined);
+    return { status: 200, data: undefined };
   }
 
-  private taskSuspend({
-    at,
-    req,
-  }: {
-    at: number;
-    req: TaskSuspendReq;
-  }): TaskSuspendRes {
+  private taskSuspend({ at, req }: { at: number; req: TaskSuspendReq }): {
+    status: 200 | 300;
+    data: undefined;
+  } {
     let status: 200 | 300 = 200;
     for (const action of req.data.actions) {
-      const { applied } = this.promiseTryToRegister({
-        at,
-        awaited: action.data.awaited,
-        awaiter: action.data.awaiter,
-      });
-      if (!applied) {
+      const { created } = this.promiseRegister({ at, req: action });
+      if (!created) {
         status = 300;
       }
     }
-    const { applied } = this.transitionTask({
+    this.transitionTask({
       at,
       id: req.data.id,
       to: "completed",
       version: req.data.version,
     });
-    assert(applied);
-    return this.buildOkRes(req, status, undefined);
+    return { status, data: undefined };
   }
-
-
-
-
-  private promiseTryToRegister({
-    at,
-    awaiter,
-    awaited,
-  }: {
-    at: number;
-    awaiter: string;
-    awaited: string;
-  }): { record: PromiseRecord; applied: boolean } {
-    const record = this.getPromiseRecord(awaited);
-
-    if (record.state !== "pending" || record.callbacks[awaited] !== undefined) {
-      return { record, applied: false };
-    }
-    const callbackId = `__resume:${awaiter}:${awaited}`;
-
-    const recv = this.getFirstRouterMatch(record);
-    assertDefined(recv);
-    record.callbacks[callbackId] = {
-      id: callbackId,
-      type: "resume",
-      awaited: awaited,
-      awaiter: awaiter,
-      recv,
-      timeoutAt: record.timeoutAt,
-      createdAt: at,
-    };
-
-    return { record, applied: true };
-  }
-
-  private promiseAndTaskCreate({
-    at,
-    id,
-    timeoutAt,
-    payload,
-    tags,
-    pid,
-    ttl,
-  }: {
-    at: number;
-    id: string;
-    timeoutAt: number;
-    payload: {
-      headers: {
-        [key: string]: string;
-      };
-      data: string;
-    };
-    tags: {
-      [key: string]: string;
-    };
-    pid?: string;
-    ttl?: number;
-  }): { promiseRecord: PromiseRecord; taskRecord?: TaskRecord } {
-    const { promiseRecord, taskRecord, applied } =
-      this.transitionPromiseAndTask({
-        at,
-        id,
-        to: "pending",
-        timeoutAt,
-        payload,
-        tags,
-      });
-
-    assert(
-      !applied ||
-        promiseRecord.state === "pending" ||
-        promiseRecord.state === "rejected_timedout",
-    );
-
-    if (
-      applied &&
-      taskRecord !== undefined &&
-      pid !== undefined &&
-      ttl !== undefined
-    ) {
-      const { record: newTaskRecord, applied } = this.transitionTask({
-        at,
-        id: taskRecord.id,
-        to: "claimed",
-        version: 1,
-        pid,
-        ttl,
-      });
-      assert(applied);
-      return { promiseRecord, taskRecord: newTaskRecord };
-    }
-
-    return { promiseRecord, taskRecord };
-  }
-
-  private buildOkRes<K extends string, S extends number, D>(
-    req: {
-      kind: K;
-      head: {
-        auth?: string;
-        corrId: string;
-        version: string;
-      };
-    },
-    status: S,
-    data: D,
-  ): {
-    kind: K;
-    head: {
-      corrId: string;
-      status: S;
-      version: string;
-    };
-    data: D;
-  } {
-    return {
-      kind: req.kind,
-      head: {
-        corrId: req.head.corrId,
-        status,
-        version: this.version,
-      },
-      data,
-    };
-  }
-
-  private buildErrorRes(req: Req, err: ServerError): ErrorRes {
-    return {
-      kind: "error",
-      head: {
-        corrId: req.head.corrId,
-        status: err.code,
-        version: this.version,
-      },
-      data: err.message,
-    };
-  }
-  private ensureVersion(req: Req) {
-    if (req.head.version !== this.version) {
-      throw new ServerError(409, "version mismatch");
-    }
-  }
-
-  private getPromiseRecord(id: string): PromiseRecord {
-    const record: PromiseRecord | undefined = this.promises[id];
-    if (!record) {
-      throw new ServerError(404, "promise not found");
-    }
-    return record;
-  }
-  private getTaskRecord(id: string): TaskRecord {
-    const record: TaskRecord | undefined = this.tasks[id];
-    if (!record) {
-      throw new ServerError(404, "task not found");
-    }
-    return record;
-  }
-
-  private transitionPromiseAndTask({
-    at,
-    id,
-    to,
-    timeoutAt,
-    payload,
-    tags,
-  }: {
-    at: number;
-    id: string;
-    to: PromiseState;
-    timeoutAt?: number;
-    payload?: { headers: { [key: string]: string }; data: string };
-    tags?: { [key: string]: string };
-  }): {
-    promiseRecord: PromiseRecord;
-    taskRecord?: TaskRecord;
-    applied: boolean;
-  } {
-    let taskRecord: TaskRecord | undefined;
-    const { record: promiseRecord, applied } = this.transitionPromise({
-      at,
-      id,
-      to,
-      timeoutAt,
-      payload,
-      tags,
-    });
-
-    if (applied && promiseRecord.state === "pending") {
-      const recv = this.getFirstRouterMatch(promiseRecord);
-      if (recv !== undefined) {
-        const { record: taskRecord, applied } = this.transitionTask({
-          at,
-          id: `__invoke:${id}`,
-          to: "init",
-          type: "invoke",
-          recv: this.targets[recv] ?? recv,
-          awaited: promiseRecord.id,
-          awaiter: promiseRecord.id,
-          timeoutAt: promiseRecord.timeoutAt,
-        });
-        assert(applied);
-        return { promiseRecord, taskRecord, applied };
-      }
-    }
-
-    if (applied && promiseRecord.state !== "pending") {
-      for (const taskRecord of Object.values(this.tasks)) {
-        if (taskRecord.awaiter === id && isNotCompleted(taskRecord.state)) {
-          const { applied } = this.transitionTask({
-            at,
-            id: taskRecord.id,
-            to: "completed",
-            force: true,
-          });
-          assert(applied);
-        }
-      }
-
-      for (const callbackRecord of Object.values(promiseRecord.callbacks)) {
-        const { applied } = this.transitionTask({
-          ...callbackRecord,
-          at,
-          to: "init",
-        });
-        assert(applied);
-      }
-      promiseRecord.callbacks = {};
-    }
-
-    return { promiseRecord, taskRecord, applied };
-  }
-
   private transitionPromise({
     at,
     id,
@@ -849,7 +752,7 @@ export class Server {
       return { record, applied: false };
     }
 
-    throw new ServerError(500, "unexpected promise transition");
+    assert(false, "unexpected promise transition");
   }
 
   private transitionTask({
@@ -999,13 +902,215 @@ export class Server {
 
     throw new ServerError(500, "invalid task transition");
   }
+  private transitionPromiseAndTask({
+    at,
+    id,
+    to,
+    timeoutAt,
+    payload,
+    tags,
+  }: {
+    at: number;
+    id: string;
+    to: PromiseState;
+    timeoutAt?: number;
+    payload?: { headers: { [key: string]: string }; data: string };
+    tags?: { [key: string]: string };
+  }): {
+    promiseRecord: PromiseRecord;
+    taskRecord?: TaskRecord;
+    applied: boolean;
+  } {
+    const { record: promiseRecord, applied } = this.transitionPromise({
+      at,
+      id,
+      to,
+      timeoutAt,
+      payload,
+      tags,
+    });
 
-  private getFirstRouterMatch(promise: PromiseRecord): string | undefined {
-    for (const router of this.routers) {
-      const recv = router.route(promise);
+    if (applied && promiseRecord.state === "pending") {
+      const recv = this.router.route(promiseRecord);
       if (recv !== undefined) {
-        return recv;
+        const { record: taskRecord, applied } = this.transitionTask({
+          at,
+          id: invokeId(id),
+          to: "init",
+          type: "invoke",
+          recv: this.targets[recv] ?? recv,
+          awaited: promiseRecord.id,
+          awaiter: promiseRecord.id,
+          timeoutAt: promiseRecord.timeoutAt,
+        });
+        assert(applied);
+        return { promiseRecord, taskRecord, applied };
       }
+    }
+
+    if (applied && promiseRecord.state !== "pending") {
+      for (const taskRecord of Object.values(this.tasks)) {
+        if (taskRecord.awaiter === id && isNotCompleted(taskRecord.state)) {
+          const { applied } = this.transitionTask({
+            at,
+            id: taskRecord.id,
+            to: "completed",
+            force: true,
+          });
+          assert(applied);
+        }
+      }
+
+      for (const callbackRecord of Object.values(promiseRecord.callbacks)) {
+        const { applied } = this.transitionTask({
+          ...callbackRecord,
+          at,
+          to: "init",
+          awaited: callbackRecord.awaited,
+        });
+        assert(applied);
+      }
+      promiseRecord.callbacks = {};
+    }
+
+    return { promiseRecord, applied };
+  }
+  private transitionSchedule({
+    at,
+    id,
+    to,
+    cron,
+    promiseId,
+    promiseTimeout,
+    promiseParam,
+    promiseTags,
+    updating,
+  }: {
+    at: number;
+    id: string;
+    to: "created" | "deleted";
+    cron?: string;
+    promiseId?: string;
+    promiseTimeout?: number;
+    promiseParam?: { headers: { [key: string]: string }; data: string };
+    promiseTags?: { [key: string]: string };
+    updating?: boolean;
+  }): { schedule: Schedule; applied: boolean } {
+    let record: ScheduleRecord | undefined = this.schedules[id];
+    if (record === undefined && to === "created") {
+      assertDefined(cron);
+      assertDefined(promiseId);
+      assertDefined(promiseTimeout);
+      assertDefined(promiseParam);
+      assertDefined(promiseTags);
+      record = {
+        id,
+        cron,
+        promiseId,
+        promiseTimeout,
+        promiseParam,
+        promiseTags,
+        createdAt: at,
+        nextRunAt: CronExpressionParser.parse(cron, { currentDate: at })
+          .next()
+          .getTime(),
+      };
+      this.schedules[id] = record;
+      return { schedule: record, applied: true };
+    }
+
+    if (record !== undefined && to === "created" && updating) {
+      record = {
+        ...record,
+        lastRunAt: record.nextRunAt,
+        nextRunAt: CronExpressionParser.parse(record.cron, { currentDate: at })
+          .next()
+          .getTime(),
+      };
+      this.schedules[id] = record;
+      return { schedule: record, applied: true };
+    }
+
+    if (record !== undefined && to === "created") {
+      return { schedule: record, applied: false };
+    }
+
+    if (record === undefined && to === "deleted") {
+      throw new ServerError(404, "schedule not found");
+    }
+
+    if (record !== undefined && to === "deleted") {
+      delete this.schedules[id];
+      return { schedule: record, applied: true };
+    }
+
+    throw new ServerError(500, "invalid schedule transition");
+  }
+  private getPromiseRecord(id: string): PromiseRecord {
+    const record: PromiseRecord | undefined = this.promises[id];
+    if (!record) {
+      throw new ServerError(404, "promise not found");
+    }
+    return record;
+  }
+  private getTaskRecord(id: string): TaskRecord {
+    const record: TaskRecord | undefined = this.tasks[id];
+    if (!record) {
+      throw new ServerError(404, "task not found");
+    }
+    return record;
+  }
+  private getScheduleRecord(id: string): ScheduleRecord {
+    const record: ScheduleRecord | undefined = this.schedules[id];
+    if (!record) {
+      throw new ServerError(404, "task not found");
+    }
+    return record;
+  }
+  private buildOkRes<K extends string, S extends number, D>({
+    kind,
+    corrId,
+    status,
+    data,
+  }: {
+    kind: K;
+    corrId: string;
+    status: S;
+    data: D;
+  }): {
+    kind: K;
+    head: {
+      corrId: string;
+      status: S;
+      version: string;
+    };
+    data: D;
+  } {
+    return {
+      kind: kind,
+      head: {
+        corrId: corrId,
+        status,
+        version: this.version,
+      },
+      data,
+    };
+  }
+
+  private buildErrorRes(req: Req, err: ServerError): ErrorRes {
+    return {
+      kind: "error",
+      head: {
+        corrId: req.head.corrId,
+        status: err.code,
+        version: this.version,
+      },
+      data: err.message,
+    };
+  }
+  private ensureVersion(req: Req) {
+    if (req.head.version !== this.version) {
+      throw new ServerError(409, "version mismatch");
     }
   }
 }
@@ -1030,4 +1135,7 @@ function isNotCompleted(
   state: string,
 ): state is "init" | "enqueued" | "claimed" {
   return state === "init" || state === "enqueued" || state === "claimed";
+}
+function invokeId(id: string): string {
+  return `__invoke:${id}`;
 }
