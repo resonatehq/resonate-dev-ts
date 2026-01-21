@@ -43,7 +43,6 @@ export type NotifyMessage = {
     promise: Promise;
   };
 };
-
 export type Message = InvokeMessage | ResumeMessage | NotifyMessage;
 
 export type Schedule = {
