@@ -1,6 +1,11 @@
 import { test } from "bun:test";
-import { Server } from "../src/index";
-import type { Promise, PromiseRegisterReq, Req, Task } from "../src/protocol";
+import {
+  type Promise,
+  type PromiseRegisterReq,
+  type Req,
+  Server,
+  type Task,
+} from "../src/index";
 
 class Random {
   constructor(public seed: number = Date.now()) {}

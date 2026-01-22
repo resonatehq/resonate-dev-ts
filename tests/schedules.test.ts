@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assert, Server, VERSION } from "../src";
+import { assert, Server, VERSION } from "../src/index";
 
 describe("schedule transitions", () => {
   test("0: create and get", () => {

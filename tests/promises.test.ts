@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assert, Server, VERSION } from "../src";
+import { assert, Server, VERSION } from "../src/index";
 
 describe("promise transitions", () => {
   test("0: transition from init to pending via create", () => {

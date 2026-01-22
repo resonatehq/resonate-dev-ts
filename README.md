@@ -1,1 +1,1 @@
-# resonate-dev-ts
+# @resonatehq/dev
