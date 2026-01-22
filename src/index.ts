@@ -91,8 +91,9 @@ class DefaultRouter {
   }
 }
 
+export const VERSION = "2025-01-15";
 export class Server {
-  private version = "2025-01-15";
+  private version = VERSION;
   private promises: { [key: string]: PromiseRecord } = {};
   private tasks: { [key: string]: TaskRecord } = {};
   private schedules: { [key: string]: ScheduleRecord } = {};

@@ -496,6 +496,8 @@ class FuzzTester {
 }
 
 test("fuzz", () => {
-  const tester = new FuzzTester();
+  const seed = Date.now();
+  console.log(seed);
+  const tester = new FuzzTester(seed);
   tester.run(100_000);
 });
