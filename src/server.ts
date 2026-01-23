@@ -24,6 +24,8 @@ import type {
   TaskAcquireRes,
   TaskCreateReq,
   TaskCreateRes,
+  TaskFulfillReq,
+  TaskFulfillRes,
   TaskGetReq,
   TaskGetRes,
   TaskHeartbeatReq,
@@ -337,8 +339,11 @@ export class Server {
           break;
         }
         case "task.fulfill": {
-          assert(false, "not implemented");
-          break;
+          return this.buildOkRes({
+            kind: req.kind,
+            corrId: req.head.corrId,
+            ...this.taskFulfill({ at, req }),
+          });
         }
         case "task.get": {
           return this.buildOkRes({
@@ -384,7 +389,7 @@ export class Server {
     at: number;
     req: PromiseCreateReq;
   }): HandlerRes<PromiseCreateRes> {
-    const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
+    const { promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
       to: "pending",
@@ -416,26 +421,31 @@ export class Server {
     at: number;
     req: PromiseRegisterReq;
   }): HandlerRes<PromiseRegisterRes> & { created: boolean } {
-    const promise = this.getPromiseRecord(req.data.awaited);
+    const promiseAwaiter = this.getPromiseRecord(req.data.awaiter);
+    const promiseAwaited = this.getPromiseRecord(req.data.awaited);
     const cbId = `__resume:${req.data.awaiter}:${req.data.awaited}`;
-    if (promise.state === "pending" || promise.callbacks[cbId] !== undefined) {
-      return { status: 200, data: { promise }, created: false };
+
+    if (
+      promiseAwaited.state === "pending" ||
+      promiseAwaiter.callbacks[cbId] !== undefined
+    ) {
+      return { status: 200, data: { promise: promiseAwaited }, created: false };
     }
 
-    const recv = this.router.route(promise);
+    const recv = this.router.route(promiseAwaiter);
     if (!recv) {
       throw new ServerError(500, "recv must be set");
     }
-    promise.callbacks[cbId] = {
+    promiseAwaited.callbacks[cbId] = {
       id: cbId,
       type: "resume",
       awaited: req.data.awaited,
       awaiter: req.data.awaiter,
       recv,
-      timeoutAt: promise.timeoutAt,
+      timeoutAt: promiseAwaiter.timeoutAt,
       createdAt: at,
     };
-    return { status: 200, data: { promise }, created: true };
+    return { status: 200, data: { promise: promiseAwaited }, created: true };
   }
   private promiseSettle({
     at,
@@ -444,7 +454,7 @@ export class Server {
     at: number;
     req: PromiseSettleReq;
   }): HandlerRes<PromiseSettleRes> {
-    const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
+    const { promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
       to: req.data.state,
@@ -465,7 +475,8 @@ export class Server {
     req: PromiseSubscribeReq;
   }): HandlerRes<PromiseSubscribeRes> {
     const promise = this.getPromiseRecord(req.data.awaited);
-    const cbId = `__notify:${req.data.address}:${req.data.awaited}`;
+    const cbId = `__notify:${req.data.awaited}:${req.data.address}`;
+
     if (promise.state !== "pending" || promise.callbacks[cbId] !== undefined) {
       return { status: 200, data: { promise } };
     }
@@ -570,11 +581,7 @@ export class Server {
     at: number;
     req: TaskCreateReq;
   }): HandlerRes<TaskCreateRes> {
-    const {
-      promiseRecord: promise,
-      taskRecord: task,
-      applied,
-    } = this.transitionPromiseAndTask({
+    const { promise, task, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.action.data.id,
       to: "pending",
@@ -601,6 +608,28 @@ export class Server {
       return { status: 200, data: { task: claimedTask, promise } };
     }
     return { status: 200, data: { promise, task } };
+  }
+  private taskFulfill({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskFulfillReq;
+  }): HandlerRes<TaskFulfillRes> {
+    const { record: promise } = this.transitionPromise({
+      at,
+      id: req.data.action.data.id,
+      to: req.data.action.data.state,
+      payload: req.data.action.data.value,
+    });
+    const { applied } = this.transitionTask({
+      at,
+      id: req.data.id,
+      to: "completed",
+      version: req.data.version,
+    });
+    assert(applied);
+    return { status: 200, data: { promise } };
   }
   private taskGet({ req }: { req: TaskGetReq }): HandlerRes<TaskGetRes> {
     return { status: 200, data: { task: this.getTaskRecord(req.data.id) } };
@@ -657,6 +686,7 @@ export class Server {
       const { created } = this.promiseRegister({ at, req: action });
       if (!created) {
         status = 300;
+        break;
       }
     }
     const { applied } = this.transitionTask({
@@ -920,11 +950,12 @@ export class Server {
     payload?: { headers: { [key: string]: string }; data: string };
     tags?: { [key: string]: string };
   }): {
-    promiseRecord: PromiseRecord;
-    taskRecord?: TaskRecord;
+    promise: PromiseRecord;
+    task?: TaskRecord;
     applied: boolean;
   } {
-    const { record: promiseRecord, applied } = this.transitionPromise({
+    // Attempt to transition the promise to the new state
+    const { record: promise, applied } = this.transitionPromise({
       at,
       id,
       to,
@@ -933,30 +964,39 @@ export class Server {
       tags,
     });
 
-    if (applied && promiseRecord.state === "pending") {
-      const recv = this.router.route(promiseRecord);
+    // If the transition wasn't applied (e.g., invalid state change), return early
+    if (!applied) {
+      return { promise, applied };
+    }
+
+    // Handle newly created pending promises by creating an associated invoke task
+    if (promise.state === "pending") {
+      const recv = this.router.route(promise);
       if (recv !== undefined) {
-        const { record: taskRecord, applied } = this.transitionTask({
+        // Create an invoke task to execute the promise
+        const { record: task, applied } = this.transitionTask({
           at,
-          id: invokeId(id),
+          id: invokeId(promise.id),
           to: "init",
           type: "invoke",
           recv: this.targets[recv] ?? recv,
-          awaited: promiseRecord.id,
-          awaiter: promiseRecord.id,
-          timeoutAt: promiseRecord.timeoutAt,
+          awaited: promise.id,
+          awaiter: promise.id,
+          timeoutAt: promise.timeoutAt,
         });
         assert(applied);
-        return { promiseRecord, taskRecord, applied };
+        return { promise, task, applied };
       }
     }
 
-    if (applied && promiseRecord.state !== "pending") {
-      for (const taskRecord of Object.values(this.tasks)) {
-        if (taskRecord.awaiter === id && isNotCompleted(taskRecord.state)) {
+    // Handle completed promises (resolved, rejected, canceled, or timed out)
+    if (promise.state !== "pending") {
+      // Complete all tasks that were awaiting this promise
+      for (const task of Object.values(this.tasks)) {
+        if (task.awaiter === promise.id && isNotCompleted(task.state)) {
           const { applied } = this.transitionTask({
             at,
-            id: taskRecord.id,
+            id: task.id,
             to: "completed",
             force: true,
           });
@@ -964,19 +1004,21 @@ export class Server {
         }
       }
 
-      for (const callbackRecord of Object.values(promiseRecord.callbacks)) {
+      // Initialize all registered callbacks for this promise
+      for (const callback of Object.values(promise.callbacks)) {
         const { applied } = this.transitionTask({
-          ...callbackRecord,
+          ...callback,
           at,
           to: "init",
-          awaited: callbackRecord.awaited,
+          awaited: callback.awaited,
         });
         assert(applied);
       }
-      promiseRecord.callbacks = {};
+      // Clear callbacks after initializing them
+      promise.callbacks = {};
     }
 
-    return { promiseRecord, applied };
+    return { promise, applied };
   }
   private transitionSchedule({
     at,
