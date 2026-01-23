@@ -730,13 +730,15 @@ export class Server {
     assert(promise.state !== "pending");
     assertDefined(promise.settledAt);
     if (promise.settledAt === at) {
-      const { applied } = this.transitionTask({
+      const { task } = this.transitionTask({
         at,
         id: req.data.id,
         to: "completed",
         version: req.data.version,
       });
-      assert(applied);
+      assert(task.state === "completed");
+      assertDefined(task.completedAt);
+      assert(task.completedAt <= at);
     }
 
     return { status: 200, data: { promise } };
