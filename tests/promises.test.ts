@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assert, Server, VERSION } from "../src/index";
+import { assert, Server } from "../src";
 
 describe("promise transitions", () => {
   test("0: transition from init to pending via create", () => {
@@ -8,7 +8,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id0",
           param: { headers: {}, data: "" },
@@ -28,7 +28,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id1",
           state: "rejected",
@@ -47,7 +47,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id2",
           state: "resolved",
@@ -66,7 +66,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id3",
           state: "rejected_canceled",
@@ -85,7 +85,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id4",
           param: { headers: {}, data: "" },
@@ -100,7 +100,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id4",
           param: { headers: {}, data: "" },
@@ -120,7 +120,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id5",
           param: { headers: {}, data: "" },
@@ -135,7 +135,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id5",
           state: "resolved",
@@ -154,7 +154,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id6",
           param: { headers: {}, data: "" },
@@ -169,7 +169,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id6",
           state: "rejected",
@@ -188,7 +188,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id7",
           param: { headers: {}, data: "" },
@@ -203,7 +203,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id7",
           state: "rejected_canceled",
@@ -222,7 +222,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id8",
           param: { headers: {}, data: "" },
@@ -237,7 +237,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id8",
           state: "resolved",
@@ -251,7 +251,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id8",
           param: { headers: {}, data: "" },
@@ -271,7 +271,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id9",
           param: { headers: {}, data: "" },
@@ -286,7 +286,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id9",
           state: "resolved",
@@ -300,7 +300,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id9",
           state: "resolved",
@@ -319,7 +319,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id10",
           param: { headers: {}, data: "" },
@@ -334,7 +334,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id10",
           state: "resolved",
@@ -348,7 +348,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id10",
           state: "rejected",
@@ -367,7 +367,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id11",
           param: { headers: {}, data: "" },
@@ -382,7 +382,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id11",
           state: "resolved",
@@ -396,7 +396,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id11",
           state: "rejected_canceled",
@@ -415,7 +415,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id12",
           param: { headers: {}, data: "" },
@@ -430,7 +430,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id12",
           state: "rejected",
@@ -444,7 +444,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id12",
           param: { headers: {}, data: "" },
@@ -464,7 +464,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id13",
           param: { headers: {}, data: "" },
@@ -479,7 +479,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id13",
           state: "rejected",
@@ -493,7 +493,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id13",
           state: "resolved",
@@ -512,7 +512,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id14",
           param: { headers: {}, data: "" },
@@ -527,7 +527,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id14",
           state: "rejected",
@@ -541,7 +541,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id14",
           state: "rejected",
@@ -560,7 +560,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id15",
           param: { headers: {}, data: "" },
@@ -575,7 +575,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id15",
           state: "rejected",
@@ -589,7 +589,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id15",
           state: "rejected_canceled",
@@ -608,7 +608,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id16",
           param: { headers: {}, data: "" },
@@ -623,7 +623,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id16",
           state: "rejected_canceled",
@@ -637,7 +637,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id16",
           param: { headers: {}, data: "" },
@@ -657,7 +657,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id17",
           param: { headers: {}, data: "" },
@@ -672,7 +672,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id17",
           state: "rejected_canceled",
@@ -686,7 +686,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id17",
           state: "resolved",
@@ -705,7 +705,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id18",
           param: { headers: {}, data: "" },
@@ -720,7 +720,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id18",
           state: "rejected_canceled",
@@ -734,7 +734,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id18",
           state: "rejected",
@@ -753,7 +753,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id19",
           param: { headers: {}, data: "" },
@@ -768,7 +768,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id19",
           state: "rejected_canceled",
@@ -782,7 +782,7 @@ describe("promise transitions", () => {
       at: 2,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id19",
           state: "rejected_canceled",
@@ -801,7 +801,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id20",
           param: { headers: {}, data: "" },
@@ -816,7 +816,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id20",
           param: { headers: {}, data: "" },
@@ -836,7 +836,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id21",
           param: { headers: {}, data: "" },
@@ -851,7 +851,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id21",
           state: "resolved",
@@ -870,7 +870,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id22",
           param: { headers: {}, data: "" },
@@ -885,7 +885,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id22",
           state: "rejected",
@@ -904,7 +904,7 @@ describe("promise transitions", () => {
       at: 0,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id23",
           param: { headers: {}, data: "" },
@@ -919,7 +919,7 @@ describe("promise transitions", () => {
       at: 1,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "id23",
           state: "rejected_canceled",

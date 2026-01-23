@@ -5,7 +5,7 @@ import {
   type Req,
   Server,
   type Task,
-} from "../src/index";
+} from "../src";
 
 class Random {
   constructor(public seed: number = Date.now()) {}

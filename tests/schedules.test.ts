@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { assert, Server, VERSION } from "../src/index";
+import { assert, Server } from "../src/index";
 
 describe("schedule transitions", () => {
   test("0: create and get", () => {
@@ -8,7 +8,7 @@ describe("schedule transitions", () => {
       at: 0,
       req: {
         kind: "schedule.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "s0",
           cron: "0 * * * *",
@@ -26,7 +26,7 @@ describe("schedule transitions", () => {
       at: 1,
       req: {
         kind: "schedule.get",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: createRes.data.schedule.id,
         },
@@ -43,7 +43,7 @@ describe("schedule transitions", () => {
       at: 0,
       req: {
         kind: "schedule.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "s1",
           cron: "* * * * *",
@@ -61,7 +61,7 @@ describe("schedule transitions", () => {
       at: 1,
       req: {
         kind: "schedule.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "s1",
           cron: "* 2 * * *",
@@ -79,7 +79,7 @@ describe("schedule transitions", () => {
       at: 2,
       req: {
         kind: "schedule.get",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: "s1",
         },

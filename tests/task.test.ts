@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { assert, Server, VERSION } from "../src/index";
+import { assert, Server } from "../src/index";
 
 function step(server: Server, at: number): { id: string; version: number } {
   const msgs = server.step({ at });
@@ -24,7 +24,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "promise.create",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: id,
           param: { headers: {}, data: "" },
@@ -41,7 +41,7 @@ describe("tasks transitions", () => {
       at,
       req: {
         kind: "promise.settle",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: { id, state: "resolved", value: { headers: {}, data: "" } },
       },
     });
@@ -54,7 +54,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -72,7 +72,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version + 1,
@@ -90,7 +90,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -107,7 +107,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.heartbeat",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           pid: "task10",
           tasks: [],
@@ -124,7 +124,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -139,7 +139,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -157,7 +157,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -172,7 +172,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -190,7 +190,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -205,7 +205,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -222,7 +222,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -237,7 +237,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -254,7 +254,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -269,7 +269,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version + 1,
@@ -286,7 +286,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -301,7 +301,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -318,7 +318,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -333,7 +333,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.heartbeat",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           pid: "task18",
           tasks: [],
@@ -350,7 +350,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -365,7 +365,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.heartbeat",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           pid: "task19",
           tasks: [],
@@ -382,7 +382,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -397,7 +397,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -411,7 +411,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -429,7 +429,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -444,7 +444,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -458,7 +458,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -475,7 +475,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.acquire",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -490,7 +490,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.suspend",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           id: task.id,
           version: task.version,
@@ -504,7 +504,7 @@ describe("tasks transitions", () => {
       at: at++,
       req: {
         kind: "task.heartbeat",
-        head: { corrId: "", version: VERSION },
+        head: { corrId: "", version: server.version },
         data: {
           pid: "task22",
           tasks: [],
