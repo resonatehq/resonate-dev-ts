@@ -260,6 +260,47 @@ export class Server {
     this.ensureVersion(req);
 
     try {
+      if (req.kind === "task.fence") {
+        const task = this.getTaskRecord(req.data.id);
+        if (task.state === "claimed" && task.version === req.data.version) {
+          switch (req.data.action.kind) {
+            case "promise.create": {
+              const res = this.buildOkRes({
+                kind: req.data.action.kind,
+                corrId: req.head.corrId,
+                ...this.promiseCreate({ at, req: req.data.action }),
+              });
+              return {
+                kind: "task.fence",
+                head: {
+                  corrId: req.head.corrId,
+                  status: 200,
+                  version: this.version,
+                },
+                data: { action: res },
+              };
+            }
+            case "promise.settle": {
+              const res = this.buildOkRes({
+                kind: req.data.action.kind,
+                corrId: req.head.corrId,
+                ...this.promiseSettle({ at, req: req.data.action }),
+              });
+              return {
+                kind: "task.fence",
+                head: {
+                  corrId: req.head.corrId,
+                  status: 200,
+                  version: this.version,
+                },
+                data: { action: res },
+              };
+            }
+          }
+        }
+        throw new ServerError(409, "version mismatch.");
+      }
+
       switch (req.kind) {
         case "promise.create": {
           return this.buildOkRes({
@@ -330,10 +371,6 @@ export class Server {
             corrId: req.head.corrId,
             ...this.taskCreate({ at, req }),
           });
-        }
-        case "task.fence": {
-          assert(false, "not implemented");
-          break;
         }
         case "task.fulfill": {
           return this.buildOkRes({
