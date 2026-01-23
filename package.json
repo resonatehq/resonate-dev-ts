@@ -19,6 +19,7 @@
     "check": "biome check",
     "format": "biome check --write",
     "prepare": "tsc",
+    "prepack": "tsc",
     "test": "bun test",
     "type-check": "npx tsc --noEmit"
   },
