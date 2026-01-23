@@ -3,21 +3,35 @@ import type {
   ErrorCode,
   ErrorRes,
   PromiseCreateReq,
+  PromiseCreateRes,
   PromiseGetReq,
+  PromiseGetRes,
   PromiseRegisterReq,
+  PromiseRegisterRes,
   PromiseSettleReq,
+  PromiseSettleRes,
   PromiseSubscribeReq,
+  PromiseSubscribeRes,
   Req,
   Res,
   ScheduleCreateReq,
+  ScheduleCreateRes,
   ScheduleDeleteReq,
+  ScheduleDeleteRes,
   ScheduleGetReq,
+  ScheduleGetRes,
   TaskAcquireReq,
+  TaskAcquireRes,
   TaskCreateReq,
+  TaskCreateRes,
   TaskGetReq,
+  TaskGetRes,
   TaskHeartbeatReq,
+  TaskHeartbeatRes,
   TaskReleaseReq,
+  TaskReleaseRes,
   TaskSuspendReq,
+  TaskSuspendRes,
 } from "./api";
 import type {
   Message,
@@ -78,6 +92,11 @@ class DefaultRouter {
     return promise.tags[this.tag];
   }
 }
+
+type Handler<T extends Res> = {
+  status: T["head"]["status"];
+  data: T["data"];
+};
 
 export class Server {
   readonly version = "2025-01-15";
@@ -361,10 +380,13 @@ export class Server {
     }
   }
 
-  private promiseCreate({ at, req }: { at: number; req: PromiseCreateReq }): {
-    status: 200;
-    data: { promise: Promise };
-  } {
+  private promiseCreate({
+    at,
+    req,
+  }: {
+    at: number;
+    req: PromiseCreateReq;
+  }): Handler<PromiseCreateRes> {
     const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
@@ -380,10 +402,11 @@ export class Server {
     );
     return { status: 200, data: { promise } };
   }
-  private promiseGet({ req }: { req: PromiseGetReq }): {
-    status: 200;
-    data: { promise: Promise };
-  } {
+  private promiseGet({
+    req,
+  }: {
+    req: PromiseGetReq;
+  }): Handler<PromiseGetRes> {
     return {
       status: 200,
       data: { promise: this.getPromiseRecord(req.data.id) },
@@ -395,13 +418,7 @@ export class Server {
   }: {
     at: number;
     req: PromiseRegisterReq;
-  }): {
-    status: 200;
-    data: {
-      promise: Promise;
-    };
-    created: boolean;
-  } {
+  }): Handler<PromiseRegisterRes> & { created: boolean } {
     const promise = this.getPromiseRecord(req.data.awaited);
     if (
       promise.state === "pending" ||
@@ -425,10 +442,13 @@ export class Server {
     };
     return { status: 200, data: { promise }, created: true };
   }
-  private promiseSettle({ at, req }: { at: number; req: PromiseSettleReq }): {
-    status: 200;
-    data: { promise: Promise };
-  } {
+  private promiseSettle({
+    at,
+    req,
+  }: {
+    at: number;
+    req: PromiseSettleReq;
+  }): Handler<PromiseSettleRes> {
     const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
@@ -448,7 +468,7 @@ export class Server {
   }: {
     at: number;
     req: PromiseSubscribeReq;
-  }): { status: 200; data: { promise: Promise } } {
+  }): Handler<PromiseSubscribeRes> {
     const promise = this.getPromiseRecord(req.data.awaited);
 
     if (
@@ -473,12 +493,13 @@ export class Server {
     };
     return { status: 200, data: { promise } };
   }
-  private scheduleCreate({ at, req }: { at: number; req: ScheduleCreateReq }): {
-    status: 200;
-    data: {
-      schedule: Schedule;
-    };
-  } {
+  private scheduleCreate({
+    at,
+    req,
+  }: {
+    at: number;
+    req: ScheduleCreateReq;
+  }): Handler<ScheduleCreateRes> {
     return {
       status: 200,
       data: {
@@ -495,10 +516,13 @@ export class Server {
       },
     };
   }
-  private scheduleDelete({ at, req }: { at: number; req: ScheduleDeleteReq }): {
-    status: 200;
-    data: undefined;
-  } {
+  private scheduleDelete({
+    at,
+    req,
+  }: {
+    at: number;
+    req: ScheduleDeleteReq;
+  }): Handler<ScheduleDeleteRes> {
     const { applied } = this.transitionSchedule({
       at,
       id: req.data.id,
@@ -507,21 +531,23 @@ export class Server {
     assert(applied);
     return { status: 200, data: undefined };
   }
-  private scheduleGet({ req }: { req: ScheduleGetReq }): {
-    status: 200;
-    data: { schedule: Schedule };
-  } {
+  private scheduleGet({
+    req,
+  }: {
+    req: ScheduleGetReq;
+  }): Handler<ScheduleGetRes> {
     return {
       status: 200,
       data: { schedule: this.getScheduleRecord(req.data.id) },
     };
   }
-  private taskAcquire({ at, req }: { at: number; req: TaskAcquireReq }): {
-    status: 200;
-    data:
-      | { kind: "invoke"; data: { invoked: Promise } }
-      | { kind: "resume"; data: { invoked: Promise; awaited: Promise } };
-  } {
+  private taskAcquire({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskAcquireReq;
+  }): Handler<TaskAcquireRes> {
     const { record: task, applied } = this.transitionTask({
       at,
       id: req.data.id,
@@ -532,37 +558,21 @@ export class Server {
     });
     assert(applied);
     assert(task.type !== "notify");
-    switch (task.type) {
-      case "invoke": {
-        return {
-          status: 200,
-          data: {
-            kind: task.type,
-            data: { invoked: this.getPromiseRecord(task.awaiter) },
-          },
-        };
-      }
-      case "resume": {
-        return {
-          status: 200,
-          data: {
-            kind: task.type,
-            data: {
-              invoked: this.getPromiseRecord(task.awaiter),
-              awaited: this.getPromiseRecord(task.awaited),
-            },
-          },
-        };
-      }
-    }
-  }
-  private taskCreate({ at, req }: { at: number; req: TaskCreateReq }): {
-    status: 200;
-    data: {
-      task?: Task;
-      promise: Promise;
+    return {
+      status: 200,
+      data: {
+        kind: task.type,
+        data: { promise: this.getPromiseRecord(task.awaiter), preload: [] },
+      },
     };
-  } {
+  }
+  private taskCreate({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskCreateReq;
+  }): Handler<TaskCreateRes> {
     const {
       promiseRecord: promise,
       taskRecord: task,
@@ -595,18 +605,16 @@ export class Server {
     }
     return { status: 200, data: { promise, task } };
   }
-  private taskGet({ req }: { req: TaskGetReq }): {
-    status: 200;
-    data: {
-      task: Task;
-    };
-  } {
+  private taskGet({ req }: { req: TaskGetReq }): Handler<TaskGetRes> {
     return { status: 200, data: { task: this.getTaskRecord(req.data.id) } };
   }
-  private taskHeartbeat({ at, req }: { at: number; req: TaskHeartbeatReq }): {
-    status: 200;
-    data: undefined;
-  } {
+  private taskHeartbeat({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskHeartbeatReq;
+  }): Handler<TaskHeartbeatRes> {
     for (const task of Object.values(this.tasks)) {
       if (task.state !== "claimed" || task.pid !== req.data.pid) {
         continue;
@@ -623,10 +631,13 @@ export class Server {
     return { status: 200, data: undefined };
   }
 
-  private taskRelease({ at, req }: { at: number; req: TaskReleaseReq }): {
-    status: 200;
-    data: undefined;
-  } {
+  private taskRelease({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskReleaseReq;
+  }): Handler<TaskReleaseRes> {
     const { applied } = this.transitionTask({
       at,
       id: req.data.id,
@@ -637,10 +648,13 @@ export class Server {
     return { status: 200, data: undefined };
   }
 
-  private taskSuspend({ at, req }: { at: number; req: TaskSuspendReq }): {
-    status: 200 | 300;
-    data: undefined;
-  } {
+  private taskSuspend({
+    at,
+    req,
+  }: {
+    at: number;
+    req: TaskSuspendReq;
+  }): Handler<TaskSuspendRes> {
     let status: 200 | 300 = 200;
     for (const action of req.data.actions) {
       const { created } = this.promiseRegister({ at, req: action });
