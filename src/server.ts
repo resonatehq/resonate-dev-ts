@@ -112,6 +112,63 @@ export class Server {
   };
   constructor(private x: number = 5000) {}
 
+  getState(): {
+    promises: { [key: string]: PromiseRecord };
+    tasks: { [key: string]: TaskRecord };
+    schedules: { [key: string]: ScheduleRecord };
+    stats: {
+      promiseCount: number;
+      taskCount: number;
+      scheduleCount: number;
+      pendingPromises: number;
+      resolvedPromises: number;
+      rejectedPromises: number;
+      canceledPromises: number;
+      timedoutPromises: number;
+      initTasks: number;
+      enqueuedTasks: number;
+      claimedTasks: number;
+      completedTasks: number;
+    };
+  } {
+    return {
+      promises: this.promises,
+      tasks: this.tasks,
+      schedules: this.schedules,
+      stats: {
+        promiseCount: Object.keys(this.promises).length,
+        taskCount: Object.keys(this.tasks).length,
+        scheduleCount: Object.keys(this.schedules).length,
+        pendingPromises: Object.values(this.promises).filter(
+          (p) => p.state === "pending",
+        ).length,
+        resolvedPromises: Object.values(this.promises).filter(
+          (p) => p.state === "resolved",
+        ).length,
+        rejectedPromises: Object.values(this.promises).filter(
+          (p) => p.state === "rejected",
+        ).length,
+        canceledPromises: Object.values(this.promises).filter(
+          (p) => p.state === "rejected_canceled",
+        ).length,
+        timedoutPromises: Object.values(this.promises).filter(
+          (p) => p.state === "rejected_timedout",
+        ).length,
+        initTasks: Object.values(this.tasks).filter((t) => t.state === "init")
+          .length,
+        enqueuedTasks: Object.values(this.tasks).filter(
+          (t) => t.state === "enqueued",
+        ).length,
+        claimedTasks: Object.values(this.tasks).filter(
+          (t) => t.state === "claimed",
+        ).length,
+        completedTasks: Object.values(this.tasks).filter(
+          (t) => t.state === "completed",
+        ).length,
+      },
+    };
+  }
+
   next({ at }: { at: number }): number | undefined {
     let timeout: number | undefined;
 
