@@ -16,9 +16,10 @@
   ],
   "scripts": {
     "build": "tsc",
-    "test": "bun test",
     "check": "biome check",
     "format": "biome check --write",
+    "prepare": "tsc",
+    "test": "bun test",
     "type-check": "npx tsc --noEmit"
   },
   "peerDependencies": {
