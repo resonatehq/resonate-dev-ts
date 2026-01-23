@@ -93,13 +93,14 @@ class DefaultRouter {
   }
 }
 
-type Handler<T extends Res> = {
+type HandlerRes<T extends Res> = {
   status: T["head"]["status"];
   data: T["data"];
 };
 
 export class Server {
   readonly version = "2025-01-15";
+
   private promises: { [key: string]: PromiseRecord } = {};
   private tasks: { [key: string]: TaskRecord } = {};
   private schedules: { [key: string]: ScheduleRecord } = {};
@@ -107,11 +108,7 @@ export class Server {
   private targets: { [key: string]: string } = {
     default: "local://any@default",
   };
-  private x: number;
-
-  constructor(x: number = 5000) {
-    this.x = x;
-  }
+  constructor(private x: number = 5000) {}
 
   next({ at }: { at: number }): number | undefined {
     let timeout: number | undefined;
@@ -386,7 +383,7 @@ export class Server {
   }: {
     at: number;
     req: PromiseCreateReq;
-  }): Handler<PromiseCreateRes> {
+  }): HandlerRes<PromiseCreateRes> {
     const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
@@ -406,7 +403,7 @@ export class Server {
     req,
   }: {
     req: PromiseGetReq;
-  }): Handler<PromiseGetRes> {
+  }): HandlerRes<PromiseGetRes> {
     return {
       status: 200,
       data: { promise: this.getPromiseRecord(req.data.id) },
@@ -418,15 +415,13 @@ export class Server {
   }: {
     at: number;
     req: PromiseRegisterReq;
-  }): Handler<PromiseRegisterRes> & { created: boolean } {
+  }): HandlerRes<PromiseRegisterRes> & { created: boolean } {
     const promise = this.getPromiseRecord(req.data.awaited);
-    if (
-      promise.state === "pending" ||
-      promise.callbacks[req.data.awaited] !== undefined
-    ) {
+    const cbId = `__resume:${req.data.awaiter}:${req.data.awaited}`;
+    if (promise.state === "pending" || promise.callbacks[cbId] !== undefined) {
       return { status: 200, data: { promise }, created: false };
     }
-    const cbId = `__resume:${req.data.awaiter}:${req.data.awaited}`;
+
     const recv = this.router.route(promise);
     if (!recv) {
       throw new ServerError(500, "recv must be set");
@@ -448,7 +443,7 @@ export class Server {
   }: {
     at: number;
     req: PromiseSettleReq;
-  }): Handler<PromiseSettleRes> {
+  }): HandlerRes<PromiseSettleRes> {
     const { promiseRecord: promise, applied } = this.transitionPromiseAndTask({
       at,
       id: req.data.id,
@@ -468,20 +463,16 @@ export class Server {
   }: {
     at: number;
     req: PromiseSubscribeReq;
-  }): Handler<PromiseSubscribeRes> {
+  }): HandlerRes<PromiseSubscribeRes> {
     const promise = this.getPromiseRecord(req.data.awaited);
-
-    if (
-      promise.state !== "pending" ||
-      promise.callbacks[req.data.awaited] !== undefined
-    ) {
+    const cbId = `__notify:${req.data.address}:${req.data.awaited}`;
+    if (promise.state !== "pending" || promise.callbacks[cbId] !== undefined) {
       return { status: 200, data: { promise } };
     }
     const recv = this.router.route(promise);
     if (!recv) {
       throw new ServerError(500, "recv must be set");
     }
-    const cbId = `__notify:${req.data.address}:${req.data.awaited}`;
     promise.callbacks[cbId] = {
       id: cbId,
       type: "notify",
@@ -499,7 +490,7 @@ export class Server {
   }: {
     at: number;
     req: ScheduleCreateReq;
-  }): Handler<ScheduleCreateRes> {
+  }): HandlerRes<ScheduleCreateRes> {
     return {
       status: 200,
       data: {
@@ -522,7 +513,7 @@ export class Server {
   }: {
     at: number;
     req: ScheduleDeleteReq;
-  }): Handler<ScheduleDeleteRes> {
+  }): HandlerRes<ScheduleDeleteRes> {
     const { applied } = this.transitionSchedule({
       at,
       id: req.data.id,
@@ -535,7 +526,7 @@ export class Server {
     req,
   }: {
     req: ScheduleGetReq;
-  }): Handler<ScheduleGetRes> {
+  }): HandlerRes<ScheduleGetRes> {
     return {
       status: 200,
       data: { schedule: this.getScheduleRecord(req.data.id) },
@@ -547,7 +538,7 @@ export class Server {
   }: {
     at: number;
     req: TaskAcquireReq;
-  }): Handler<TaskAcquireRes> {
+  }): HandlerRes<TaskAcquireRes> {
     const { record: task, applied } = this.transitionTask({
       at,
       id: req.data.id,
@@ -558,11 +549,17 @@ export class Server {
     });
     assert(applied);
     assert(task.type !== "notify");
+
     return {
       status: 200,
       data: {
         kind: task.type,
-        data: { promise: this.getPromiseRecord(task.awaiter), preload: [] },
+        data: {
+          promise: this.getPromiseRecord(task.awaiter),
+          preload: Object.values(this.promises).filter(
+            (p) => p.state !== "pending",
+          ),
+        },
       },
     };
   }
@@ -572,7 +569,7 @@ export class Server {
   }: {
     at: number;
     req: TaskCreateReq;
-  }): Handler<TaskCreateRes> {
+  }): HandlerRes<TaskCreateRes> {
     const {
       promiseRecord: promise,
       taskRecord: task,
@@ -605,7 +602,7 @@ export class Server {
     }
     return { status: 200, data: { promise, task } };
   }
-  private taskGet({ req }: { req: TaskGetReq }): Handler<TaskGetRes> {
+  private taskGet({ req }: { req: TaskGetReq }): HandlerRes<TaskGetRes> {
     return { status: 200, data: { task: this.getTaskRecord(req.data.id) } };
   }
   private taskHeartbeat({
@@ -614,7 +611,7 @@ export class Server {
   }: {
     at: number;
     req: TaskHeartbeatReq;
-  }): Handler<TaskHeartbeatRes> {
+  }): HandlerRes<TaskHeartbeatRes> {
     for (const task of Object.values(this.tasks)) {
       if (task.state !== "claimed" || task.pid !== req.data.pid) {
         continue;
@@ -637,7 +634,7 @@ export class Server {
   }: {
     at: number;
     req: TaskReleaseReq;
-  }): Handler<TaskReleaseRes> {
+  }): HandlerRes<TaskReleaseRes> {
     const { applied } = this.transitionTask({
       at,
       id: req.data.id,
@@ -654,7 +651,7 @@ export class Server {
   }: {
     at: number;
     req: TaskSuspendReq;
-  }): Handler<TaskSuspendRes> {
+  }): HandlerRes<TaskSuspendRes> {
     let status: 200 | 300 = 200;
     for (const action of req.data.actions) {
       const { created } = this.promiseRegister({ at, req: action });
@@ -662,12 +659,15 @@ export class Server {
         status = 300;
       }
     }
-    this.transitionTask({
+    const { applied } = this.transitionTask({
       at,
       id: req.data.id,
       to: "completed",
       version: req.data.version,
     });
+    if (applied) {
+      // this is expected to be an invariant once we move the tasks to waiting
+    }
     return { status, data: undefined };
   }
   private transitionPromise({
@@ -736,6 +736,8 @@ export class Server {
       record = {
         ...record,
         state: record.tags["resonate:timeout"] === "true" ? "resolved" : to,
+        value: { headers: {}, data: "" },
+        settledAt: at,
       };
 
       this.promises[id] = record;
@@ -1118,7 +1120,7 @@ export class Server {
 }
 
 function isTerminalState(
-  state: string,
+  state: PromiseState,
 ): state is "resolved" | "rejected" | "rejected_canceled" {
   return (
     state === "resolved" ||

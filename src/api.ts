@@ -114,7 +114,7 @@ export type TaskAcquireReq = ReqSchema<
 export type TaskAcquireRes = ResSchema<
   "task.acquire",
   200,
-  { kind: "invoke" | "resume"; data: { promise: Promise; preload: [] } }
+  { kind: "invoke" | "resume"; data: { promise: Promise; preload: Promise[] } }
 >;
 
 export type TaskSuspendReq = ReqSchema<
