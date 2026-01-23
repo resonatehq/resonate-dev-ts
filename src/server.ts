@@ -736,7 +736,6 @@ export class Server {
       record = {
         ...record,
         state: record.tags["resonate:timeout"] === "true" ? "resolved" : to,
-        value: { headers: {}, data: "" },
         settledAt: at,
       };
 
