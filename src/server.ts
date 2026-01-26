@@ -110,7 +110,7 @@ export class Server {
   private targets: { [key: string]: string } = {
     default: "local://any@default",
   };
-  constructor(private x: number = 5000) {}
+  constructor(private taskExpiryMs: number = 5000) {}
 
   getState(): {
     promises: { [key: string]: PromiseRecord };
@@ -170,31 +170,32 @@ export class Server {
   }
 
   next({ at }: { at: number }): number | undefined {
-    let timeout: number | undefined;
+    let timeout = Infinity;
 
     for (const promise of Object.values(this.promises)) {
       if (promise.state === "pending") {
-        timeout = Math.min(promise.timeoutAt, timeout ?? promise.timeoutAt);
+        timeout = Math.min(promise.timeoutAt, timeout);
       }
     }
 
     for (const schedule of Object.values(this.schedules)) {
-      timeout = Math.min(schedule.nextRunAt, timeout ?? schedule.nextRunAt);
+      timeout = Math.min(schedule.nextRunAt, timeout);
     }
 
     for (const task of Object.values(this.tasks)) {
       if (isNotCompleted(task.state)) {
-        timeout = Math.min(task.expiry, timeout ?? task.expiry);
+        timeout = Math.min(task.expiry, timeout);
       }
     }
 
-    return timeout !== undefined
-      ? Math.min(Math.max(0, timeout - at), 2147483647)
-      : timeout;
+    return timeout === Infinity
+      ? undefined
+      : Math.min(Math.max(0, timeout - at), 2147483647);
   }
 
   step({ at }: { at: number }): { mesg: Message; recv: string }[] {
-    for (const schedule of Object.values(this.schedules)) {
+    const schedulesSnapshot = Object.values(this.schedules);
+    for (const schedule of schedulesSnapshot) {
       if (at < schedule.nextRunAt) {
         continue;
       }
@@ -224,7 +225,8 @@ export class Server {
       assert(applied);
     }
 
-    for (const promise of Object.values(this.promises)) {
+    const promisesSnapshot = Object.values(this.promises);
+    for (const promise of promisesSnapshot) {
       if (promise.state === "pending" && at >= promise.timeoutAt) {
         const { applied } = this.transitionPromise({
           at,
@@ -235,7 +237,8 @@ export class Server {
       }
     }
 
-    for (const task of Object.values(this.tasks)) {
+    const tasksSnapshot = Object.values(this.tasks);
+    for (const task of tasksSnapshot) {
       if (isActiveState(task.state)) {
         if (at >= task.expiry) {
           const { applied } = this.transitionTask({
@@ -318,158 +321,143 @@ export class Server {
 
     try {
       if (req.kind === "task.fence") {
-        const task = this.getTaskRecord(req.data.id);
-        if (task.state === "claimed" && task.version === req.data.version) {
-          switch (req.data.action.kind) {
-            case "promise.create": {
-              const res = this.buildOkRes({
-                kind: req.data.action.kind,
-                corrId: req.head.corrId,
-                ...this.promiseCreate({ at, req: req.data.action }),
-              });
-              return {
-                kind: "task.fence",
-                head: {
-                  corrId: req.head.corrId,
-                  status: 200,
-                  version: this.version,
-                },
-                data: { action: res },
-              };
-            }
-            case "promise.settle": {
-              const res = this.buildOkRes({
-                kind: req.data.action.kind,
-                corrId: req.head.corrId,
-                ...this.promiseSettle({ at, req: req.data.action }),
-              });
-              return {
-                kind: "task.fence",
-                head: {
-                  corrId: req.head.corrId,
-                  status: 200,
-                  version: this.version,
-                },
-                data: { action: res },
-              };
-            }
-          }
-        }
-        throw new ServerError(409, "version mismatch.");
+        return this.processFence({ at, req });
       }
-
-      switch (req.kind) {
-        case "promise.create": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.promiseCreate({ at, req }),
-          });
-        }
-        case "promise.get": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.promiseGet({ req }),
-          });
-        }
-        case "promise.register": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.promiseRegister({ at, req }),
-          });
-        }
-        case "promise.settle": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.promiseSettle({ at, req }),
-          });
-        }
-        case "promise.subscribe": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.promiseSubscribe({ at, req }),
-          });
-        }
-        case "schedule.create": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.scheduleCreate({ at, req }),
-          });
-        }
-        case "schedule.delete": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.scheduleDelete({ at, req }),
-          });
-        }
-        case "schedule.get": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.scheduleGet({ req }),
-          });
-        }
-        case "task.acquire": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.taskAcquire({ at, req }),
-          });
-        }
-        case "task.create": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.taskCreate({ at, req }),
-          });
-        }
-        case "task.fulfill": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.taskFulfill({ at, req }),
-          });
-        }
-        case "task.get": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.taskGet({ req }),
-          });
-        }
-        case "task.heartbeat": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.taskHeartbeat({ at, req }),
-          });
-        }
-        case "task.release": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.taskRelease({ at, req }),
-          });
-        }
-        case "task.suspend": {
-          return this.buildOkRes({
-            kind: req.kind,
-            corrId: req.head.corrId,
-            ...this.taskSuspend({ at, req }),
-          });
-        }
-      }
+      return this.processRequest({ at, req });
     } catch (err) {
       if (err instanceof ServerError) {
         return this.buildErrorRes(req, err);
       }
       throw err;
+    }
+  }
+
+  private processFence({
+    at,
+    req,
+  }: {
+    at: number;
+    req: Extract<Req, { kind: "task.fence" }>;
+  }): Res {
+    const task = this.getTaskRecord(req.data.id);
+    if (task.state !== "claimed" || task.version !== req.data.version) {
+      throw new ServerError(409, "version mismatch.");
+    }
+    return {
+      kind: "task.fence",
+      head: { corrId: req.head.corrId, status: 200, version: this.version },
+      data: {
+        action:
+          req.data.action.kind === "promise.create"
+            ? this.buildOkRes({
+                kind: req.data.action.kind,
+                corrId: req.head.corrId,
+                ...this.promiseCreate({ at, req: req.data.action }),
+              })
+            : this.buildOkRes({
+                kind: req.data.action.kind,
+                corrId: req.head.corrId,
+                ...this.promiseSettle({ at, req: req.data.action }),
+              }),
+      },
+    };
+  }
+
+  private processRequest({ at, req }: { at: number; req: Req }): Res {
+    const corrId = req.head.corrId;
+    switch (req.kind) {
+      case "promise.create":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.promiseCreate({ at, req }),
+        });
+      case "promise.get":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.promiseGet({ req }),
+        });
+      case "promise.register":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.promiseRegister({ at, req }),
+        });
+      case "promise.settle":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.promiseSettle({ at, req }),
+        });
+      case "promise.subscribe":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.promiseSubscribe({ at, req }),
+        });
+      case "schedule.create":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.scheduleCreate({ at, req }),
+        });
+      case "schedule.delete":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.scheduleDelete({ at, req }),
+        });
+      case "schedule.get":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.scheduleGet({ req }),
+        });
+      case "task.acquire":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.taskAcquire({ at, req }),
+        });
+      case "task.create":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.taskCreate({ at, req }),
+        });
+      case "task.fulfill":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.taskFulfill({ at, req }),
+        });
+      case "task.get":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.taskGet({ req }),
+        });
+      case "task.heartbeat":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.taskHeartbeat({ at, req }),
+        });
+      case "task.release":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.taskRelease({ at, req }),
+        });
+      case "task.suspend":
+        return this.buildOkRes({
+          kind: req.kind,
+          corrId,
+          ...this.taskSuspend({ at, req }),
+        });
+      case "task.fence":
+        throw new ServerError(500, "unexpected task.fence in processRequest");
     }
   }
 
@@ -955,7 +943,7 @@ export class Server {
     }
 
     if (task.state === "init" && to === "enqueued") {
-      task = { ...task, state: to, expiry: at + this.x };
+      task = { ...task, state: to, expiry: at + this.taskExpiryMs };
       this.tasks[id] = task;
       return { task, applied: true };
     }
@@ -983,24 +971,14 @@ export class Server {
       return { task, applied: true };
     }
 
-    if (task.state === "claimed" && task.version === version && to === "init") {
+    if (
+      (task.state === "claimed" && task.version === version && to === "init") ||
+      (isActiveState(task.state) && to === "init" && force)
+    ) {
       task = {
         ...task,
         version: task.version + 1,
-        state: to,
-        pid: undefined,
-        ttl: undefined,
-        expiry: 0,
-      };
-      this.tasks[id] = task;
-      return { task, applied: true };
-    }
-
-    if (isActiveState(task.state) && to === "init") {
-      task = {
-        ...task,
-        version: task.version + 1,
-        state: to,
+        state: "init",
         pid: undefined,
         ttl: undefined,
         expiry: 0,
@@ -1035,10 +1013,6 @@ export class Server {
 
     if (task.state === "completed" && to === "completed") {
       return { task, applied: false };
-    }
-
-    if (task === undefined) {
-      throw new ServerError(404, "task not found");
     }
 
     throw new ServerError(500, "invalid task transition");
@@ -1223,7 +1197,7 @@ export class Server {
   private getScheduleRecord(id: string): ScheduleRecord {
     const schedule: ScheduleRecord | undefined = this.schedules[id];
     if (!schedule) {
-      throw new ServerError(404, "task not found");
+      throw new ServerError(404, "schedule not found");
     }
     return schedule;
   }
@@ -1247,9 +1221,9 @@ export class Server {
     data: D;
   } {
     return {
-      kind: kind,
+      kind,
       head: {
-        corrId: corrId,
+        corrId,
         status,
         version: this.version,
       },
