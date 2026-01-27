@@ -1,17 +1,16 @@
 {
   "name": "@resonatehq/dev",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A TypeScript development server implementation for the Resonate distributed async/await framework.",
   "repository": {
     "url": "https://github.com/resonatehq/resonate-dev-ts"
   },
-  "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
       "default": "./dist/index.js"
     }
   },
