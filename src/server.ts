@@ -317,8 +317,6 @@ export class Server {
     return mesgs;
   }
   process({ at, req }: { at: number; req: Req }): Res {
-    this.ensureVersion(req);
-
     try {
       if (req.kind === "task.fence") {
         return this.processFence({ at, req });
@@ -1241,11 +1239,6 @@ export class Server {
       },
       data: err.message,
     };
-  }
-  private ensureVersion(req: Req) {
-    if (req.head.version !== this.version) {
-      throw new ServerError(409, "version mismatch");
-    }
   }
 }
 
