@@ -1,7 +1,7 @@
 {
   "name": "@resonatehq/dev",
   "version": "0.1.0",
-  "description": "Resonate FaaS handler for Cloudflare Workers (TypeScript)",
+  "description": "A TypeScript development server implementation for the Resonate distributed async/await framework.",
   "repository": {
     "url": "https://github.com/resonatehq/resonate-dev-ts"
   },
