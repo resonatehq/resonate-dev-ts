@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { assert, Server } from "../src";
+import { Server } from "../src";
+import { assert } from "../src/utils";
 
 describe("promise transitions", () => {
   test("<id>: <operation> from <state> to <state> returns <status>. with <side-effects-if-present>", () => {

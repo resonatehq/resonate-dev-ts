@@ -26,6 +26,9 @@ After every code change to TypeScript files, run:
 3. `bun run type-check` - Type checking
 4. `bun run test` - Code test
 
+## Exports
+- **src/index.ts**: Must only export the `Server` class. Do not add other exports to this file.
+
 ## Code Style
 - **Runtime**: Bun (ES modules)
 - **Formatting**: Biome (2-space indent, double quotes, LF line endings)

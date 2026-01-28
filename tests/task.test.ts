@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { assert, Server } from "../src/index";
+import { Server } from "../src";
+import { assert } from "../src/utils";
 
 function step(server: Server, at: number): { id: string; version: number } {
   const msgs = server.step({ at });
