@@ -39,14 +39,9 @@ import type {
 import type { Message, Promise, Schedule, Task } from "./entities";
 import { assert, assertDefined, isStatus } from "./utils";
 
-class ServerError extends Error {
-  readonly code: ErrorCode;
-
-  constructor(code: ErrorCode, message: string) {
-    super(message);
-    this.code = code;
-  }
-}
+type Result<T> =
+  | { kind: "value"; data: T }
+  | { kind: "error"; status: ErrorCode; message: string };
 
 type PromiseRecord = Promise & {
   callbacks: {
@@ -104,7 +99,37 @@ export class Server {
 
   step({ at }: { at: number }): { mesg: Message; recv: string }[] {}
 
-  process({ at, req }: { at: number; req: Req }): Res {}
+  process({ at, req }: { at: number; req: Req }): Res {
+    switch (req.kind) {
+      case "promise.get": {
+        return this.promiseGet({ req });
+      }
+    }
+  }
+  private promiseGet({ req }: { req: PromiseGetReq }): PromiseGetRes {
+    const result = this.getPromiseRecord(req.data.id);
+    switch (result.kind) {
+      case "error": {
+        assert(result.status === 404);
+        return {
+          kind: req.kind,
+          head: {
+            corrId: req.head.corrId,
+            status: result.status,
+            version: this.version,
+          },
+          data: result.message,
+        };
+      }
+      case "value": {
+        return {
+          kind: req.kind,
+          head: { corrId: req.head.corrId, status: 200, version: this.version },
+          data: { promise: result.data },
+        };
+      }
+    }
+  }
 
   private invokeId(promiseId: string): string {
     return `__invoke:${promiseId}`;
@@ -117,35 +142,28 @@ export class Server {
   private notifyId(awaitedId: string, address: string): string {
     return `__notify:${awaitedId}:${address}`;
   }
-  private getPromiseRecord(id: string): PromiseRecord {
+  private getPromiseRecord(id: string): Result<PromiseRecord> {
     const promise = this.promises[id];
     if (!promise) {
-      throw new ServerError(404, "promise not found");
+      return { kind: "error", status: 404, message: "promise not found" };
     }
-    return promise;
+    return { kind: "value", data: promise };
   }
 
-  private getTaskRecord(id: string): TaskRecord {
+  private getTaskRecord(id: string): Result<TaskRecord> {
     const task = this.tasks[id];
     if (!task) {
-      throw new ServerError(404, "task not found");
+      return { kind: "error", status: 404, message: "task not found" };
     }
-    return task;
+    return { kind: "value", data: task };
   }
 
-  private getScheduleRecord(id: string): ScheduleRecord {
+  private getScheduleRecord(id: string): Result<ScheduleRecord> {
     const schedule = this.schedules[id];
     if (!schedule) {
-      throw new ServerError(404, "schedule not found");
+      return { kind: "error", status: 404, message: "schedule not found" };
     }
-    return schedule;
-  }
-
-  private toError(e: unknown): { status: ErrorCode; message: string } {
-    if (e instanceof ServerError) {
-      return { status: e.code, message: e.message };
-    }
-    return { status: 500, message: String(e) };
+    return { kind: "value", data: schedule };
   }
 
   private toPromise(record: PromiseRecord): Promise {
