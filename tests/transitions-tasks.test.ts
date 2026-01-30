@@ -179,7 +179,7 @@ function heartbeatTask(
 }
 
 describe("TaskGet() Transitions", () => {
-  test("TaskGet() | ⊥ → ⊥ | 404", () => {
+  test("1 -> TaskGet() | ⊥ → ⊥ | 404", () => {
     const server = new Server();
     const res = server.process({
       at: 0,
@@ -193,7 +193,7 @@ describe("TaskGet() Transitions", () => {
     assert(isStatus(res, 404));
   });
 
-  test("TaskGet() | ⟨p, e, l, v, c, R⟩ → same | 200", () => {
+  test("2 -> TaskGet() | ⟨p, e, l, v, c, R⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = server.process({
@@ -209,7 +209,7 @@ describe("TaskGet() Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskGet() | ⟨a, e, l, v, c, R⟩ → same | 200", () => {
+  test("3 -> TaskGet() | ⟨a, e, l, v, c, R⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -226,7 +226,7 @@ describe("TaskGet() Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskGet() | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200", () => {
+  test("4 -> TaskGet() | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -244,7 +244,7 @@ describe("TaskGet() Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskGet() | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 200", () => {
+  test("5 -> TaskGet() | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -263,7 +263,7 @@ describe("TaskGet() Transitions", () => {
 });
 
 describe("TaskCreate(t, l) Transitions", () => {
-  test("TaskCreate | ⊥ → ⟨a, t+l, l, 0, Invoke, ∅⟩ | 200", () => {
+  test("6 -> TaskCreate | ⊥ → ⟨a, t+l, l, 0, Invoke, ∅⟩ | 200", () => {
     const server = new Server();
     const res = server.process({
       at: 0,
@@ -292,7 +292,7 @@ describe("TaskCreate(t, l) Transitions", () => {
     settlePromise(server, "p1", 1);
   });
 
-  test("TaskCreate | ⟨p, e, l, v, c, R⟩ → same | 200 (idempotent)", () => {
+  test("7 -> TaskCreate | ⟨p, e, l, v, c, R⟩ → same | 200 (idempotent)", () => {
     const server = new Server();
     createPromiseWithTask(server, "p1", 0);
     const res = server.process({
@@ -318,10 +318,12 @@ describe("TaskCreate(t, l) Transitions", () => {
     });
     assert(res.kind === "task.create");
     assert(isStatus(res, 200));
+    expect(res.data.task).toBeUndefined();
+    expect(res.data.promise.createdAt).toBe(0);
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskCreate | ⟨a, e, l, v, c, R⟩ → same | 200 (idempotent)", () => {
+  test("8 -> TaskCreate | ⟨a, e, l, v, c, R⟩ → same | 200 (idempotent)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -349,10 +351,11 @@ describe("TaskCreate(t, l) Transitions", () => {
     assert(res.kind === "task.create");
     assert(isStatus(res, 200));
     expect(res.data.task).toBeUndefined();
+    expect(res.data.promise.createdAt).toBe(0);
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskCreate | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200 (idempotent)", () => {
+  test("9 -> TaskCreate | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200 (idempotent)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -381,10 +384,11 @@ describe("TaskCreate(t, l) Transitions", () => {
     assert(res.kind === "task.create");
     assert(isStatus(res, 200));
     expect(res.data.task).toBeUndefined();
+    expect(res.data.promise.createdAt).toBe(0);
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskCreate | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 200 (idempotent)", () => {
+  test("10 -> TaskCreate | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 200 (idempotent)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -413,18 +417,19 @@ describe("TaskCreate(t, l) Transitions", () => {
     assert(res.kind === "task.create");
     assert(isStatus(res, 200));
     expect(res.data.task).toBeUndefined();
+    expect(res.data.promise.createdAt).toBe(0);
   });
 });
 
 describe("TaskAcquire(t, l, v) Transitions", () => {
-  test("TaskAcquire(v) | ⊥ → ⊥ | 404", () => {
+  test("11 -> TaskAcquire(v) | ⊥ → ⊥ | 404", () => {
     const server = new Server();
     const res = acquireTask(server, "nonexistent", 0, 0);
     assert(res.kind === "task.acquire");
     assert(isStatus(res, 404));
   });
 
-  test("TaskAcquire(v) | ⟨p, e, l, v, c, R⟩ → ⟨a, t+l, l, v, c, R⟩ | 200", () => {
+  test("12 -> TaskAcquire(v) | ⟨p, e, l, v, c, R⟩ → ⟨a, t+l, l, v, c, R⟩ | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = acquireTask(server, task.id, task.version, 1);
@@ -433,7 +438,7 @@ describe("TaskAcquire(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskAcquire(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("13 -> TaskAcquire(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = acquireTask(server, task.id, task.version + 1, 1);
@@ -442,7 +447,7 @@ describe("TaskAcquire(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskAcquire(v) | ⟨a, e, l, v, c, R⟩ → same | 409", () => {
+  test("14 -> TaskAcquire(v) | ⟨a, e, l, v, c, R⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -452,7 +457,7 @@ describe("TaskAcquire(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskAcquire(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("15 -> TaskAcquire(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -462,7 +467,7 @@ describe("TaskAcquire(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskAcquire(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
+  test("16 -> TaskAcquire(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -473,7 +478,7 @@ describe("TaskAcquire(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskAcquire(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
+  test("17 -> TaskAcquire(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -484,7 +489,7 @@ describe("TaskAcquire(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskAcquire(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
+  test("18 -> TaskAcquire(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -496,14 +501,14 @@ describe("TaskAcquire(t, l, v) Transitions", () => {
 });
 
 describe("TaskRelease(t, l, v) Transitions", () => {
-  test("TaskRelease(v) | ⊥ → ⊥ | 404", () => {
+  test("19 -> TaskRelease(v) | ⊥ → ⊥ | 404", () => {
     const server = new Server();
     const res = releaseTask(server, "nonexistent", 0, 0);
     assert(res.kind === "task.release");
     assert(isStatus(res, 404));
   });
 
-  test("TaskRelease(v) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
+  test("20 -> TaskRelease(v) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = releaseTask(server, task.id, task.version, 1);
@@ -512,7 +517,7 @@ describe("TaskRelease(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskRelease(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("21 -> TaskRelease(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = releaseTask(server, task.id, task.version + 1, 1);
@@ -521,7 +526,7 @@ describe("TaskRelease(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskRelease(v) | ⟨a, e, l, v, Invoke, R⟩ → ⟨p, t+l, l, v+1, Invoke, R⟩ | 200 | Send(Invoke)", () => {
+  test("22 -> TaskRelease(v) | ⟨a, e, l, v, Invoke, R⟩ → ⟨p, t+l, l, v+1, Invoke, R⟩ | 200 | Send(Invoke)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -536,7 +541,7 @@ describe("TaskRelease(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskRelease(v) | ⟨a, e, l, v, Resume, R⟩ → ⟨p, t+l, l, v+1, Resume, R⟩ | 200 | Send(Resume)", () => {
+  test("23 -> TaskRelease(v) | ⟨a, e, l, v, Resume, R⟩ → ⟨p, t+l, l, v+1, Resume, R⟩ | 200 | Send(Resume)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -574,7 +579,7 @@ describe("TaskRelease(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 6);
   });
 
-  test("TaskRelease(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("24 -> TaskRelease(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -584,7 +589,7 @@ describe("TaskRelease(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskRelease(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
+  test("25 -> TaskRelease(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -595,7 +600,7 @@ describe("TaskRelease(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskRelease(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
+  test("26 -> TaskRelease(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -606,7 +611,7 @@ describe("TaskRelease(t, l, v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskRelease(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
+  test("27 -> TaskRelease(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -618,14 +623,14 @@ describe("TaskRelease(t, l, v) Transitions", () => {
 });
 
 describe("TaskSuspend(v, P) Transitions", () => {
-  test("TaskSuspend(v, P) | ⊥ → ⊥ | 404", () => {
+  test("28 -> TaskSuspend(v, P) | ⊥ → ⊥ | 404", () => {
     const server = new Server();
     const res = suspendTask(server, "nonexistent", 0, 0);
     assert(res.kind === "task.suspend");
     assert(isStatus(res, 404));
   });
 
-  test("TaskSuspend(v, P) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
+  test("29 -> TaskSuspend(v, P) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = suspendTask(server, task.id, task.version, 1);
@@ -634,7 +639,7 @@ describe("TaskSuspend(v, P) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskSuspend(v', P) | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("30 -> TaskSuspend(v', P) | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = suspendTask(server, task.id, task.version + 1, 1);
@@ -643,7 +648,7 @@ describe("TaskSuspend(v, P) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskSuspend(v, P) | ⟨a, e, l, v, c, ∅⟩ : Pending(p) ∀p∈P → ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ | 200", () => {
+  test("31 -> TaskSuspend(v, P) | ⟨a, e, l, v, c, ∅⟩ : Pending(p) ∀p∈P → ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -661,7 +666,7 @@ describe("TaskSuspend(v, P) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskSuspend(v, P) | ⟨a, e, l, v, c, ∅⟩ : Settled(p) ∃p∈P → ⟨a, e, l, v, Resume, ∅⟩ | 300", () => {
+  test("32 -> TaskSuspend(v, P) | ⟨a, e, l, v, c, ∅⟩ : Settled(p) ∃p∈P → ⟨a, e, l, v, Resume, ∅⟩ | 300", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -679,7 +684,7 @@ describe("TaskSuspend(v, P) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskSuspend(v', P) | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("34 -> TaskSuspend(v', P) | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -689,7 +694,7 @@ describe("TaskSuspend(v, P) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskSuspend(v, P) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
+  test("35 -> TaskSuspend(v, P) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -700,7 +705,7 @@ describe("TaskSuspend(v, P) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskSuspend(v', P) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
+  test("36 -> TaskSuspend(v', P) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -711,7 +716,7 @@ describe("TaskSuspend(v, P) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskSuspend(v, P) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
+  test("37 -> TaskSuspend(v, P) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -723,14 +728,14 @@ describe("TaskSuspend(v, P) Transitions", () => {
 });
 
 describe("TaskFence(v) Transitions", () => {
-  test("TaskFence(v) | ⊥ → ⊥ | 404", () => {
+  test("38 -> TaskFence(v) | ⊥ → ⊥ | 404", () => {
     const server = new Server();
     const res = fenceTask(server, "nonexistent", 0, 0);
     assert(res.kind === "task.fence");
     assert(isStatus(res, 404));
   });
 
-  test("TaskFence(v) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
+  test("39 -> TaskFence(v) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = fenceTask(server, task.id, task.version, 1);
@@ -739,7 +744,7 @@ describe("TaskFence(v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskFence(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("40 -> TaskFence(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = fenceTask(server, task.id, task.version + 1, 1);
@@ -748,7 +753,7 @@ describe("TaskFence(v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskFence(v) | ⟨a, e, l, v, c, R⟩ → same | 200", () => {
+  test("41 -> TaskFence(v) | ⟨a, e, l, v, c, R⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -758,7 +763,7 @@ describe("TaskFence(v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskFence(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("42 -> TaskFence(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -768,7 +773,7 @@ describe("TaskFence(v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskFence(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
+  test("43 -> TaskFence(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -779,7 +784,7 @@ describe("TaskFence(v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskFence(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
+  test("44 -> TaskFence(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -790,29 +795,30 @@ describe("TaskFence(v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskFence(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
+  test("45 -> TaskFence(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
     fulfillTask(server, task.id, task.version, "p1", 2);
     const res = fenceTask(server, task.id, task.version, 3);
-    assert(res.kind === "task.fence");
-    assert(isStatus(res, 409));
-  });
-
-  test("TaskFence(v') | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
-    const server = new Server();
-    const task = createPromiseWithTask(server, "p1", 0);
-    acquireTask(server, task.id, task.version, 1);
-    fulfillTask(server, task.id, task.version, "p1", 2);
-    const res = fenceTask(server, task.id, task.version + 1, 3);
     assert(res.kind === "task.fence");
     assert(isStatus(res, 409));
   });
 });
 
 describe("TaskHeartbeat(t, v) Transitions", () => {
-  test("TaskHeartbeat(t, v) | ⟨p, e, l, v, c, R⟩ → same | 200", () => {
+  test("46 -> TaskHeartbeat(t, v) | ⊥ -> ⊥ | 404", () => {
+    const server = new Server();
+    const res = heartbeatTask(
+      server,
+      "worker1",
+      [{ id: "nonexisting", version: 0 }],
+      1,
+    );
+    assert(res.kind === "task.heartbeat");
+    assert(isStatus(res, 404));
+  });
+  test("47 -> TaskHeartbeat(t, v) | ⟨p, e, l, v, c, R⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = heartbeatTask(server, "worker1", [task], 1);
@@ -821,7 +827,7 @@ describe("TaskHeartbeat(t, v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskHeartbeat(t, v') | ⟨p, e, l, v, c, R⟩ → same | 200 (noop)", () => {
+  test("48 -> TaskHeartbeat(t, v') | ⟨p, e, l, v, c, R⟩ → same | 200 (noop)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = heartbeatTask(
@@ -835,17 +841,22 @@ describe("TaskHeartbeat(t, v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskHeartbeat(t, v) | ⟨a, e, l, v, c, R⟩ → ⟨a, t+l, l, v, c, R⟩ | 200", () => {
-    const server = new Server();
+  test("49 -> TaskHeartbeat(t, v) | ⟨a, e, l, v, c, R⟩ → ⟨a, t+l, l, v, c, R⟩ | 200", () => {
+    const taskExpiryMs = 5000;
+    const server = new Server(taskExpiryMs);
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
+    const before = server.getState().tasks[task.id].expiry;
+    expect(before).toBe(taskExpiryMs + 1);
     const res = heartbeatTask(server, "worker1", [task], 2);
+    const after = server.getState().tasks[task.id].expiry;
+    expect(after).toBe(taskExpiryMs + 2);
     assert(res.kind === "task.heartbeat");
     assert(isStatus(res, 200));
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskHeartbeat(t, v') | ⟨a, e, l, v, c, R⟩ → same | 200 (not extended)", () => {
+  test("50 -> TaskHeartbeat(t, v') | ⟨a, e, l, v, c, R⟩ → same | 200 (not extended)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -860,7 +871,7 @@ describe("TaskHeartbeat(t, v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskHeartbeat(t, v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200", () => {
+  test("51 -> TaskHeartbeat(t, v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -871,7 +882,7 @@ describe("TaskHeartbeat(t, v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskHeartbeat(t, v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200 (noop)", () => {
+  test("52 -> TaskHeartbeat(t, v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 200 (noop)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -887,7 +898,7 @@ describe("TaskHeartbeat(t, v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskHeartbeat(t, v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 200", () => {
+  test("53 -> TaskHeartbeat(t, v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -899,14 +910,14 @@ describe("TaskHeartbeat(t, v) Transitions", () => {
 });
 
 describe("TaskFulfill(v) Transitions", () => {
-  test("TaskFulfill(v) | ⊥ → ⊥ | 404", () => {
+  test("54 -> TaskFulfill(v) | ⊥ → ⊥ | 404", () => {
     const server = new Server();
     const res = fulfillTask(server, "nonexistent", 0, "nonexistent", 0);
     assert(res.kind === "task.fulfill");
     assert(isStatus(res, 404));
   });
 
-  test("TaskFulfill(v) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
+  test("55 -> TaskFulfill(v) | ⟨p, e, l, v, c, R⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = fulfillTask(server, task.id, task.version, "p1", 1);
@@ -915,7 +926,7 @@ describe("TaskFulfill(v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskFulfill(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("56 -> TaskFulfill(v') | ⟨p, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     const res = fulfillTask(server, task.id, task.version + 1, "p1", 1);
@@ -924,7 +935,7 @@ describe("TaskFulfill(v) Transitions", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("TaskFulfill(v) | ⟨a, e, l, v, c, R⟩ → ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ | 200", () => {
+  test("57 -> TaskFulfill(v) | ⟨a, e, l, v, c, R⟩ → ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ | 200", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -933,7 +944,7 @@ describe("TaskFulfill(v) Transitions", () => {
     assert(isStatus(res, 200));
   });
 
-  test("TaskFulfill(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
+  test("58 -> TaskFulfill(v') | ⟨a, e, l, v, c, R⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -943,7 +954,7 @@ describe("TaskFulfill(v) Transitions", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("TaskFulfill(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
+  test("59 -> TaskFulfill(v) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -954,7 +965,7 @@ describe("TaskFulfill(v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskFulfill(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
+  test("60 -> TaskFulfill(v') | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -965,38 +976,30 @@ describe("TaskFulfill(v) Transitions", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("TaskFulfill(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
+  test("61 -> TaskFulfill(v) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
     fulfillTask(server, task.id, task.version, "p1", 2);
     const res = fulfillTask(server, task.id, task.version, "p1", 3);
-    assert(res.kind === "task.fulfill");
-    assert(isStatus(res, 409));
-  });
-
-  test("TaskFulfill(v') | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | 409 (version mismatch)", () => {
-    const server = new Server();
-    const task = createPromiseWithTask(server, "p1", 0);
-    acquireTask(server, task.id, task.version, 1);
-    fulfillTask(server, task.id, task.version, "p1", 2);
-    const res = fulfillTask(server, task.id, task.version + 1, "p1", 3);
     assert(res.kind === "task.fulfill");
     assert(isStatus(res, 409));
   });
 });
 
 describe("Enqueue(Invoke, t, l) Side Effects", () => {
-  test("Enqueue(Invoke) | ⊥ → ⟨p, t+l, l, 0, Invoke, ∅⟩ | Send(Invoke)", () => {
+  test("62 -> Enqueue(Invoke) | ⊥ → ⟨p, t+l, l, 0, Invoke, ∅⟩ | Send(Invoke)", () => {
     const server = new Server();
     createPromise(server, "p1", 0, { tags: { "resonate:invoke": "default" } });
     const msgs = server.step({ at: 0 });
     expect(msgs.length).toBe(1);
     expect(msgs[0].mesg.kind).toBe("invoke");
+    assert(msgs[0].mesg.kind === "invoke");
+    expect(msgs[0].mesg.data.task.id).toStartWith("__invoke");
     settlePromise(server, "p1", 1);
   });
 
-  test("Enqueue(Invoke) | ⟨p, e, l, v, c, R⟩ → same | no additional effect", () => {
+  test("63 -> Enqueue(Invoke) | ⟨p, e, l, v, c, R⟩ → same | no additional effect", () => {
     const server = new Server();
     createPromise(server, "p1", 0, { tags: { "resonate:invoke": "default" } });
     server.step({ at: 0 });
@@ -1006,7 +1009,7 @@ describe("Enqueue(Invoke, t, l) Side Effects", () => {
     settlePromise(server, "p1", 2);
   });
 
-  test("Enqueue(Invoke) | ⟨a, e, l, v, c, R⟩ → same | no additional effect", () => {
+  test("64 -> Enqueue(Invoke) | ⟨a, e, l, v, c, R⟩ → same | no additional effect", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -1016,7 +1019,7 @@ describe("Enqueue(Invoke, t, l) Side Effects", () => {
     settlePromise(server, "p1", 3);
   });
 
-  test("Enqueue(Invoke) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | no additional effect", () => {
+  test("65 -> Enqueue(Invoke) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | no additional effect", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -1027,7 +1030,7 @@ describe("Enqueue(Invoke, t, l) Side Effects", () => {
     settlePromise(server, "p1", 4);
   });
 
-  test("Enqueue(Invoke) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | no additional effect", () => {
+  test("66 -> Enqueue(Invoke) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | no additional effect", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -1039,7 +1042,7 @@ describe("Enqueue(Invoke, t, l) Side Effects", () => {
 });
 
 describe("Enqueue(Resume, t, l) Side Effects", () => {
-  test("Enqueue(Resume) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → ⟨p, t+l, l, v+1, Resume, ∅⟩ | Send(Resume)", () => {
+  test("68 -> Enqueue(Resume) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → ⟨p, t+l, l, v+1, Resume, ∅⟩ | Send(Resume)", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -1056,11 +1059,12 @@ describe("Enqueue(Resume, t, l) Side Effects", () => {
     expect(msgs.length).toBe(1);
     expect(msgs[0].mesg.kind).toBe("resume");
     assert(msgs[0].mesg.kind === "resume");
+    expect(msgs[0].mesg.data.task.id).toStartWith("__resume");
     expect(msgs[0].mesg.data.task.version).toBe(task.version + 1);
     settlePromise(server, "p1", 4);
   });
 
-  test("Enqueue(Resume) | ⟨p, e, l, v, c, R⟩ → ⟨p, e, l, v, c, R::Resume⟩ | no immediate send", () => {
+  test("69 -> Enqueue(Resume) | ⟨p, e, l, v, c, R⟩ → ⟨p, e, l, v, c, R::Resume⟩ | no immediate send", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -1090,7 +1094,7 @@ describe("Enqueue(Resume, t, l) Side Effects", () => {
     settlePromise(server, "p1", 5);
   });
 
-  test("Enqueue(Resume) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | no effect", () => {
+  test("71 -> Enqueue(Resume) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | no effect", () => {
     const server = new Server();
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -1116,13 +1120,13 @@ describe("Enqueue(Resume, t, l) Side Effects", () => {
 });
 
 describe("Tick(t) Transitions", () => {
-  test("Tick(t) | ⊥ → ⊥ | no effect", () => {
+  test("72 -> Tick(t) | ⊥ → ⊥ | no effect", () => {
     const server = new Server();
     const msgs = server.step({ at: 1000 });
     expect(msgs.length).toBe(0);
   });
 
-  test("Tick(t < e) | ⟨p, e, l, v, c, R⟩ → same | no change, no message", () => {
+  test("73 -> Tick(t < e) | ⟨p, e, l, v, c, R⟩ → same | no change, no message", () => {
     const server = new Server(5000);
     const task = createPromiseWithTask(server, "p1", 0);
     const msgs = server.step({ at: 10 });
@@ -1141,7 +1145,7 @@ describe("Tick(t) Transitions", () => {
     settlePromise(server, "p1", 12);
   });
 
-  test("Tick(t ≥ e) | ⟨p, e, l, v, Invoke, R⟩ → ⟨p, t+l, l, v, Invoke, R⟩ | Send(Invoke)", () => {
+  test("74 -> Tick(t ≥ e) | ⟨p, e, l, v, Invoke, R⟩ → ⟨p, t+l, l, v, Invoke, R⟩ | Send(Invoke)", () => {
     const server = new Server(50);
     const task = createPromiseWithTask(server, "p1", 0);
     const msgs = server.step({ at: 100 });
@@ -1152,7 +1156,7 @@ describe("Tick(t) Transitions", () => {
     settlePromise(server, "p1", 101);
   });
 
-  test("Tick(t ≥ e) | ⟨p, e, l, v, Resume, R⟩ → ⟨p, t+l, l, v, Resume, R⟩ | Send(Resume)", () => {
+  test("75 -> Tick(t ≥ e) | ⟨p, e, l, v, Resume, R⟩ → ⟨p, t+l, l, v, Resume, R⟩ | Send(Resume)", () => {
     const server = new Server(50);
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -1179,7 +1183,7 @@ describe("Tick(t) Transitions", () => {
     settlePromise(server, "p1", 101);
   });
 
-  test("Tick(t < e) | ⟨a, e, l, v, c, R⟩ → same | no change, no message", () => {
+  test("76 -> Tick(t < e) | ⟨a, e, l, v, c, R⟩ → same | no change, no message", () => {
     const server = new Server(100);
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -1188,7 +1192,7 @@ describe("Tick(t) Transitions", () => {
     settlePromise(server, "p1", 11);
   });
 
-  test("Tick(t ≥ e) | ⟨a, e, l, v, Invoke, R⟩ → ⟨p, t+l, l, v+1, Invoke, R⟩ | Send(Invoke)", () => {
+  test("77 -> Tick(t ≥ e) | ⟨a, e, l, v, Invoke, R⟩ → ⟨p, t+l, l, v+1, Invoke, R⟩ | Send(Invoke)", () => {
     const server = new Server(50);
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -1196,11 +1200,12 @@ describe("Tick(t) Transitions", () => {
     expect(msgs.length).toBe(1);
     expect(msgs[0].mesg.kind).toBe("invoke");
     assert(msgs[0].mesg.kind === "invoke");
+    expect(msgs[0].mesg.data.task.id).toStartWith("__invoke");
     expect(msgs[0].mesg.data.task.version).toBe(task.version + 1);
     settlePromise(server, "p1", 101);
   });
 
-  test("Tick(t ≥ e) | ⟨a, e, l, v, Resume, R⟩ → ⟨p, t+l, l, v+1, Resume, R⟩ | Send(Resume)", () => {
+  test("78 -> Tick(t ≥ e) | ⟨a, e, l, v, Resume, R⟩ → ⟨p, t+l, l, v+1, Resume, R⟩ | Send(Resume)", () => {
     const server = new Server(50);
     const task = createPromiseWithTask(server, "p1", 0);
     createPromise(server, "p2", 0);
@@ -1217,6 +1222,7 @@ describe("Tick(t) Transitions", () => {
     expect(resumeMsgs.length).toBe(1);
     expect(resumeMsgs[0].mesg.kind).toBe("resume");
     assert(resumeMsgs[0].mesg.kind === "resume");
+    expect(resumeMsgs[0].mesg.data.task.id).toStartWith("__resume");
     const resumeTask = resumeMsgs[0].mesg.data.task;
 
     acquireTask(server, resumeTask.id, resumeTask.version, 4);
@@ -1225,11 +1231,12 @@ describe("Tick(t) Transitions", () => {
     expect(tickMsgs.length).toBe(1);
     expect(tickMsgs[0].mesg.kind).toBe("resume");
     assert(tickMsgs[0].mesg.kind === "resume");
+    expect(resumeMsgs[0].mesg.data.task.id).toStartWith("__resume");
     expect(tickMsgs[0].mesg.data.task.version).toBe(resumeTask.version + 1);
     settlePromise(server, "p1", 101);
   });
 
-  test("Tick(t) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | no change, no message", () => {
+  test("79 -> Tick(t) | ⟨s, ⊥, ⊥, v, ⊥, ∅⟩ → same | no change, no message", () => {
     const server = new Server(100);
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);
@@ -1239,7 +1246,7 @@ describe("Tick(t) Transitions", () => {
     settlePromise(server, "p1", 10001);
   });
 
-  test("Tick(t) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | no change, no message", () => {
+  test("80 -> Tick(t) | ⟨f, ⊥, ⊥, ⊥, ⊥, ∅⟩ → same | no change, no message", () => {
     const server = new Server(100);
     const task = createPromiseWithTask(server, "p1", 0);
     acquireTask(server, task.id, task.version, 1);

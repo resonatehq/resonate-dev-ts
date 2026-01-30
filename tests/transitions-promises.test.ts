@@ -76,7 +76,7 @@ function registerPromise(
 }
 
 describe("PromiseGet() Transitions", () => {
-  test("PromiseGet() | ⊥ → ⊥ | 404", () => {
+  test("1 -> PromiseGet() | ⊥ → ⊥ | 404", () => {
     const server = new Server();
     const res = server.process({
       at: 0,
@@ -91,7 +91,7 @@ describe("PromiseGet() Transitions", () => {
     expect(server.step({ at: 0 }).length).toBe(0);
   });
 
-  test("PromiseGet() | ⟨p, o, ⊥, ⊥, ∅, S⟩ → same | 200", () => {
+  test("2 -> PromiseGet() | ⟨p, o, ⊥, ⊥, ∅, S⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0);
     const res = server.process({
@@ -108,7 +108,7 @@ describe("PromiseGet() Transitions", () => {
     expect(server.step({ at: 1 }).length).toBe(0);
   });
 
-  test("PromiseGet() | ⟨p, o, ⊥, a, C, S⟩ → same | 200", () => {
+  test("3 -> PromiseGet() | ⟨p, o, ⊥, a, C, S⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0, { tags: { "resonate:invoke": "default" } });
     server.step({ at: 0 });
@@ -123,10 +123,11 @@ describe("PromiseGet() Transitions", () => {
     assert(res.kind === "promise.get");
     assert(isStatus(res, 200));
     expect(res.data.promise.state).toBe("pending");
+    expect(server.step({ at: 1 }).length).toBe(0);
     settlePromise(server, "p1", 2);
   });
 
-  test("PromiseGet() | ⟨p, o, ⊤, ⊥, ∅, S⟩ → same | 200", () => {
+  test("4 -> PromiseGet() | ⟨p, o, ⊤, ⊥, ∅, S⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0, { tags: { "resonate:timeout": "true" } });
     const res = server.process({
@@ -140,9 +141,10 @@ describe("PromiseGet() Transitions", () => {
     assert(res.kind === "promise.get");
     assert(isStatus(res, 200));
     expect(res.data.promise.state).toBe("pending");
+    expect(server.step({ at: 1 }).length).toBe(0);
   });
 
-  test("PromiseGet() | ⟨p, o, ⊤, a, C, S⟩ → same | 200", () => {
+  test("5 -> PromiseGet() | ⟨p, o, ⊤, a, C, S⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0, {
       tags: { "resonate:invoke": "default", "resonate:timeout": "true" },
@@ -159,10 +161,11 @@ describe("PromiseGet() Transitions", () => {
     assert(res.kind === "promise.get");
     assert(isStatus(res, 200));
     expect(res.data.promise.state).toBe("pending");
+    expect(server.step({ at: 1 }).length).toBe(0);
     settlePromise(server, "p1", 2);
   });
 
-  test("PromiseGet() | ⟨r, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
+  test("6 -> PromiseGet() | ⟨r, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0);
     settlePromise(server, "p1", 1, "resolved");
@@ -177,9 +180,10 @@ describe("PromiseGet() Transitions", () => {
     assert(res.kind === "promise.get");
     assert(isStatus(res, 200));
     expect(res.data.promise.state).toBe("resolved");
+    expect(server.step({ at: 2 }).length).toBe(0);
   });
 
-  test("PromiseGet() | ⟨x, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
+  test("7 -> PromiseGet() | ⟨x, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0);
     settlePromise(server, "p1", 1, "rejected");
@@ -194,9 +198,10 @@ describe("PromiseGet() Transitions", () => {
     assert(res.kind === "promise.get");
     assert(isStatus(res, 200));
     expect(res.data.promise.state).toBe("rejected");
+    expect(server.step({ at: 2 }).length).toBe(0);
   });
 
-  test("PromiseGet() | ⟨c, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
+  test("8 -> PromiseGet() | ⟨c, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0);
     settlePromise(server, "p1", 1, "rejected_canceled");
@@ -211,9 +216,10 @@ describe("PromiseGet() Transitions", () => {
     assert(res.kind === "promise.get");
     assert(isStatus(res, 200));
     expect(res.data.promise.state).toBe("rejected_canceled");
+    expect(server.step({ at: 2 }).length).toBe(0);
   });
 
-  test("PromiseGet() | ⟨t, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
+  test("9 -> PromiseGet() | ⟨t, ⊥, ⊥, ⊥, ∅, ∅⟩ → same | 200", () => {
     const server = new Server();
     createPromise(server, "p1", 0, { timeoutAt: 0 });
     const res = server.process({
@@ -227,11 +233,12 @@ describe("PromiseGet() Transitions", () => {
     assert(res.kind === "promise.get");
     assert(isStatus(res, 200));
     expect(res.data.promise.state).toBe("rejected_timedout");
+    expect(server.step({ at: 1 }).length).toBe(0);
   });
 });
 
 describe("PromiseCreate(t, o, ⊥, ⊥) - no timer, no address", () => {
-  test("PromiseCreate | ⊥ → ⟨p, o, ⊥, ⊥, ∅, ∅⟩ | 200 | no side effects", () => {
+  test("10 ->PromiseCreate | ⊥ → ⟨p, o, ⊥, ⊥, ∅, ∅⟩ | 200 | no side effects", () => {
     const server = new Server();
     const res = createPromise(server, "p1", 0);
     assert(res.kind === "promise.create");
@@ -240,7 +247,7 @@ describe("PromiseCreate(t, o, ⊥, ⊥) - no timer, no address", () => {
     expect(server.step({ at: 0 }).length).toBe(0);
   });
 
-  test("PromiseCreate | ⟨p, o, ⊥, ⊥, ∅, S⟩ : t < o → same | 200 | no side effects", () => {
+  test("11 -> PromiseCreate | ⟨p, o, ⊥, ⊥, ∅, S⟩ : t < o → same | 200 | no side effects", () => {
     const server = new Server();
     createPromise(server, "p1", 0, { timeoutAt: 100 });
     const res = createPromise(server, "p1", 50, { timeoutAt: 100 });
@@ -250,7 +257,7 @@ describe("PromiseCreate(t, o, ⊥, ⊥) - no timer, no address", () => {
     expect(server.step({ at: 50 }).length).toBe(0);
   });
 
-  test("PromiseCreate | ⟨p, o, ⊥, ⊥, ∅, S⟩ : t ≥ o → ⟨t⟩ | 200 | Send(Notify) ∀s∈S", () => {
+  test("12 -> PromiseCreate | ⟨p, o, ⊥, ⊥, ∅, S⟩ : t ≥ o → ⟨t⟩ | 200 | Send(Notify) ∀s∈S", () => {
     const server = new Server();
     createPromise(server, "p1", 0, { timeoutAt: 50 });
     subscribePromise(server, "p1", "sub1", 0);
@@ -264,7 +271,7 @@ describe("PromiseCreate(t, o, ⊥, ⊥) - no timer, no address", () => {
     expect(msgs[0].recv).toBe("sub1");
   });
 
-  test("PromiseCreate | ⟨p, o, ⊥, a, C, S⟩ : t < o → same | 200 | no side effects", () => {
+  test("13 -> PromiseCreate | ⟨p, o, ⊥, a, C, S⟩ : t < o → same | 200 | no side effects", () => {
     const server = new Server();
     createPromise(server, "p1", 0, {
       timeoutAt: 100,
@@ -279,7 +286,7 @@ describe("PromiseCreate(t, o, ⊥, ⊥) - no timer, no address", () => {
     settlePromise(server, "p1", 51);
   });
 
-  test("PromiseCreate | ⟨p, o, ⊥, a, C, S⟩ : t ≥ o → ⟨t⟩ | 200 | Enqueue(Resume) ∀c∈C, Send(Notify) ∀s∈S", () => {
+  test("14 -> PromiseCreate | ⟨p, o, ⊥, a, C, S⟩ : t ≥ o → ⟨t⟩ | 200 | Enqueue(Resume) ∀c∈C, Send(Notify) ∀s∈S", () => {
     const server = new Server();
     createPromise(server, "awaiter", 0, {
       tags: { "resonate:invoke": "default" },

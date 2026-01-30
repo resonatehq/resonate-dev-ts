@@ -12,8 +12,8 @@
 ## Architecture
 Resonate dev server: in-memory implementation of the Resonate durable execution platform for testing.
 - `src/server.ts` - Main Server class handling promises, tasks, and schedules state machines
-- `src/api.ts` - Request/response type definitions (Req, Res, and per-operation types)
-- `src/entities.ts` - Core domain types (Promise, Task, Schedule, Message)
+- `src/api.ts` - Request/response type definitions (Req, Res, and per-operation types) DO NOT MODIFY
+- `src/entities.ts` - Core domain types (Promise, Task, Schedule, Message) DO NOT MODIFY
 - `tests/` - Bun test files testing state transitions. See @doc/*.md
 
 ## After TypeScript Changes
@@ -35,6 +35,7 @@ After every code change to TypeScript files, run:
 
 ## Public API (Do Not Change)
 The Server class exposes exactly three public methods (plus `getState()` for debugging):
+- **`getState()`**: Return state records. Used for white-box testing.
 - **`next({ at })`**: Returns ms until next timeout (promise/schedule/task expiry). Returns `undefined` if nothing pending.
 - **`step({ at })`**: Advances time—triggers scheduled promises, times out pending promises, resets expired tasks, dispatches ready tasks. Returns `{ mesg, recv }[]` for messages to deliver.
 - **`process({ at, req })`**: Handles all Req types (promise.*, task.*, schedule.*) and returns corresponding Res.
