@@ -951,32 +951,57 @@ export class Server {
     for (const callback of Object.values(promise.callbacks)) {
       if (callback.type === "resume") {
         const invokeTaskId = this.invokeId(callback.awaiter);
-        const existingTask = this.tasks[invokeTaskId];
-        if (existingTask && existingTask.state === "completed") {
-          existingTask.state = "init";
-          existingTask.version += 1;
-          existingTask.type = "resume";
-          existingTask.expiry = at;
-          existingTask.completedAt = undefined;
-        } else if (!existingTask || existingTask.type !== "resume") {
-          const resumeTaskId = this.resumeId(
-            callback.awaiter,
-            callback.awaited,
-          );
-          const existingResumeTask = this.tasks[resumeTaskId];
-          if (!existingResumeTask) {
-            this.tasks[resumeTaskId] = {
-              id: resumeTaskId,
-              version: 0,
-              state: "init",
-              type: "resume",
-              recv: callback.recv,
-              awaiter: callback.awaiter,
-              awaited: callback.awaited,
-              timeoutAt: callback.timeoutAt,
-              expiry: at,
-              createdAt: at,
-            };
+        const existingInvokeTask = this.tasks[invokeTaskId];
+        const resumeTaskId = this.resumeId(callback.awaiter, callback.awaited);
+        const existingResumeTask = this.tasks[resumeTaskId];
+
+        // Check if there's already an active resume task for this awaiter
+        let hasActiveResumeTask = false;
+        for (const t of Object.values(this.tasks)) {
+          if (
+            t.id.startsWith("__resume:" + callback.awaiter + ":") &&
+            t.state !== "completed"
+          ) {
+            hasActiveResumeTask = true;
+            break;
+          }
+        }
+
+        if (!hasActiveResumeTask) {
+          if (existingInvokeTask && existingInvokeTask.state === "completed") {
+            // Create a new resume task with incremented version from completed invoke task
+            if (!existingResumeTask) {
+              this.tasks[resumeTaskId] = {
+                id: resumeTaskId,
+                version: 0,
+                state: "init",
+                type: "resume",
+                recv: callback.recv,
+                awaiter: callback.awaiter,
+                awaited: callback.awaited,
+                timeoutAt: callback.timeoutAt,
+                expiry: at,
+                createdAt: at,
+              };
+            }
+          } else if (
+            !existingInvokeTask ||
+            existingInvokeTask.type !== "resume"
+          ) {
+            if (!existingResumeTask) {
+              this.tasks[resumeTaskId] = {
+                id: resumeTaskId,
+                version: 0,
+                state: "init",
+                type: "resume",
+                recv: callback.recv,
+                awaiter: callback.awaiter,
+                awaited: callback.awaited,
+                timeoutAt: callback.timeoutAt,
+                expiry: at,
+                createdAt: at,
+              };
+            }
           }
         }
       }
@@ -1024,10 +1049,31 @@ export class Server {
 
   private getTaskRecord(id: string): Result<TaskRecord> {
     const task = this.tasks[id];
-    if (!task) {
-      return { kind: "error", status: 404, message: "task not found" };
+
+    if (task) {
+      // If the task exists and is not completed, return it directly
+      if (task.state !== "completed") {
+        return { kind: "value", data: task };
+      }
+
+      // If it's an invoke task and is completed, look for an active resume task
+      if (id.startsWith("__invoke:")) {
+        const awaiterId = id.replace("__invoke:", "");
+        for (const t of Object.values(this.tasks)) {
+          if (
+            t.id.startsWith("__resume:" + awaiterId + ":") &&
+            t.state !== "completed"
+          ) {
+            return { kind: "value", data: t };
+          }
+        }
+      }
+
+      // Return the completed task if no active resume found
+      return { kind: "value", data: task };
     }
-    return { kind: "value", data: task };
+
+    return { kind: "error", status: 404, message: "task not found" };
   }
 
   private getScheduleRecord(id: string): Result<ScheduleRecord> {
